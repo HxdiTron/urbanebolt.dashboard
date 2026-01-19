@@ -12,6 +12,7 @@
     <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvcmNteGFjcHlwaHN2and0bWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3OTk5OTMsImV4cCI6MjA4NDM3NTk5M30.l-nvIX7nkuRBhLoT-T6QlYtQNpd1JarFCqX8D-HRXt4">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="assets/supabase-runtime.js"></script>
+    <script src="assets/data.js"></script>
     <script src="assets/nav.js" defer></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -80,8 +81,8 @@
             <div class="flex items-center gap-3 w-full p-2 rounded-lg border border-slate-200 bg-slate-50">
                 <img src="https://ui-avatars.com/api/?name=Hub+Manager&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
                 <div class="flex flex-col min-w-0">
-                    <span id="authUserEmailSidebar" class="text-xs font-semibold text-slate-900 truncate">—</span>
-                    <span class="text-[10px] text-slate-500 truncate">Authenticated</span>
+                    <span class="text-xs font-semibold text-slate-900 truncate">UrbaneBolt</span>
+                    <span class="text-[10px] text-slate-500 truncate">Public dashboard</span>
                 </div>
             </div>
         </div>
@@ -108,27 +109,61 @@
             <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
                 <div class="flex items-start justify-between">
                     <div>
-                        <h2 class="text-sm font-bold text-slate-900">Manifest Builder</h2>
-                        <p class="text-xs text-slate-500 mt-1">This page is wired and protected. Add manifest views here.</p>
+                        <h2 class="text-sm font-bold text-slate-900">Master Manifest (Supabase)</h2>
+                        <p class="text-xs text-slate-500 mt-1">Live list from the <span class="font-semibold text-slate-700">shipments</span> table. No mock values.</p>
                     </div>
                     <a href="index.html" class="text-xs font-semibold text-blue-600 hover:underline">Back to Dashboard</a>
                 </div>
-                <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                <div class="mt-5 grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Inbound</p>
-                        <p class="mt-2 text-sm font-bold text-slate-900">Coming soon</p>
-                        <p class="mt-1 text-xs text-slate-500">Scan, validate, and dispatch.</p>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Total</p>
+                        <p id="mTotal" class="mt-2 text-xl font-bold text-slate-900">—</p>
                     </div>
                     <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Outbound</p>
-                        <p class="mt-2 text-sm font-bold text-slate-900">Coming soon</p>
-                        <p class="mt-1 text-xs text-slate-500">Bag creation and linehaul handover.</p>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Delivered</p>
+                        <p id="mDelivered" class="mt-2 text-xl font-bold text-emerald-700">—</p>
                     </div>
                     <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Audit</p>
-                        <p class="mt-2 text-sm font-bold text-slate-900">Coming soon</p>
-                        <p class="mt-1 text-xs text-slate-500">Mismatch and reconciliation.</p>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">In Progress</p>
+                        <p id="mInProgress" class="mt-2 text-xl font-bold text-blue-700">—</p>
                     </div>
+                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Exceptions</p>
+                        <p id="mExceptions" class="mt-2 text-xl font-bold text-amber-700">—</p>
+                    </div>
+                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Last Refresh</p>
+                        <p id="mRefresh" class="mt-2 text-xl font-bold text-slate-900">—</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl premium-border premium-shadow flex flex-col overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Shipments</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Latest records (from Supabase)</p>
+                    </div>
+                    <span id="manifestTableStatus" class="text-xs text-slate-500">Loading…</span>
+                </div>
+                <div class="overflow-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">AWB</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Customer</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Route</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Service</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">COD</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">Declared</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="manifestTableBody" class="divide-y divide-slate-100 text-sm">
+                            <tr><td colspan="7" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">Loading…</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -140,7 +175,64 @@
             currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
         }
 
-        // Public mode: no auth required.
+        (async function loadManifest() {
+            const data = window.DashboardData;
+            const escape = data?.escapeHtml || ((v) => String(v));
+            const format = data?.formatCurrency || ((v) => String(v));
+            const categoryOf = data?.getStatusCategory || (() => 'other');
+
+            const tableStatus = document.getElementById('manifestTableStatus');
+            const tbody = document.getElementById('manifestTableBody');
+
+            const res = data?.fetchShipmentsSafe ? await data.fetchShipmentsSafe({ limit: 500 }) : { rows: [], error: 'Data helper not loaded' };
+            if (res.error) {
+                if (tableStatus) tableStatus.textContent = `Supabase error: ${res.error}`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">${escape(res.error)}</td></tr>`;
+                return;
+            }
+
+            const rows = res.rows || [];
+            const total = rows.length;
+            const delivered = rows.filter(r => categoryOf(r.statusDescription, r.statusCode) === 'delivered').length;
+            const inProgress = rows.filter(r => categoryOf(r.statusDescription, r.statusCode) === 'in-progress').length;
+            const exceptions = rows.filter(r => categoryOf(r.statusDescription, r.statusCode) === 'exception').length;
+
+            document.getElementById('mTotal').textContent = String(total);
+            document.getElementById('mDelivered').textContent = String(delivered);
+            document.getElementById('mInProgress').textContent = String(inProgress);
+            document.getElementById('mExceptions').textContent = String(exceptions);
+            document.getElementById('mRefresh').textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+            const getDate = data?.getRowDate || (() => null);
+            const sorted = [...rows].sort((a, b) => (getDate(b)?.getTime() || 0) - (getDate(a)?.getTime() || 0));
+            const top = sorted.slice(0, 200);
+            if (tableStatus) tableStatus.textContent = `Showing ${top.length} / ${rows.length}`;
+
+            if (!tbody) return;
+            if (top.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">No shipments found.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = top.map((r) => {
+                const pill = data?.statusPillHtml ? data.statusPillHtml(r.statusDescription, r.statusCode) : escape(r.statusDescription || r.statusCode || '—');
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-3 px-6 font-mono text-xs font-semibold text-slate-700">
+                            <a class="text-blue-600 hover:underline" href="shipment.html?awb=${encodeURIComponent(String(r.awbNumber || ''))}">
+                                ${escape(r.awbNumber || '—')}
+                            </a>
+                        </td>
+                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape(r.customerName || '—')}</td>
+                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape((r.origin || '—') + ' → ' + (r.destination || '—'))}</td>
+                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape(r.serviceType || '—')}</td>
+                        <td class="py-3 px-6 text-right text-xs font-bold text-slate-900">${format(Number(r.collectable_value) || 0)}</td>
+                        <td class="py-3 px-6 text-right text-xs font-semibold text-slate-700">${format(Number(r.declared_value) || 0)}</td>
+                        <td class="py-3 px-6">${pill}</td>
+                    </tr>
+                `;
+            }).join('');
+        })();
     </script>
 </body>
 </html>

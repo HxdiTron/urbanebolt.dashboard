@@ -11,6 +11,7 @@
     <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvcmNteGFjcHlwaHN2and0bWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3OTk5OTMsImV4cCI6MjA4NDM3NTk5M30.l-nvIX7nkuRBhLoT-T6QlYtQNpd1JarFCqX8D-HRXt4">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="assets/supabase-runtime.js"></script>
+    <script src="assets/data.js"></script>
     <script src="assets/nav.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -109,7 +110,7 @@
                 <a href="exceptions.html" data-nav-href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
                     <iconify-icon icon="solar:danger-triangle-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
                     RTO & Exceptions
-                    <span class="ml-auto bg-rose-100 text-rose-600 py-0.5 px-2 rounded-full text-[10px] font-semibold">12</span>
+                    <span id="exceptionsBadge" class="ml-auto bg-rose-100 text-rose-600 py-0.5 px-2 rounded-full text-[10px] font-semibold hidden">0</span>
                 </a>
             </nav>
         </div>
@@ -250,7 +251,7 @@
                         </div>
                     <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">COD Collected Today</span>
                     </div>
-                    <h3 id="metric-cod-collected" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">₹0</h3>
+                    <h3 id="metric-cod-collected" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">—</h3>
                     <p class="text-xs text-slate-400 mt-1">Cash collected on successful deliveries</p>
                 </div>
 
@@ -262,7 +263,7 @@
                         </div>
                         <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Amount Earned Today</span>
                     </div>
-                    <h3 id="metric-earned" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">₹0</h3>
+                    <h3 id="metric-earned" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">—</h3>
                     <p class="text-xs text-slate-400 mt-1">Total declared value of delivered shipments</p>
                 </div>
             </div>
@@ -343,7 +344,7 @@
                         </div>
                         <div class="pt-2 border-t border-slate-100 text-xs text-slate-500">
                             <span class="font-semibold text-slate-700">COD collected today:</span>
-                            <span id="chart-cod-collected-inline" class="font-semibold text-slate-900">₹0</span>
+                            <span id="chart-cod-collected-inline" class="font-semibold text-slate-900">—</span>
                         </div>
                     </div>
                 </div>
@@ -425,43 +426,8 @@
                         <iconify-icon icon="solar:history-linear" class="text-slate-400"></iconify-icon>
                         Recent Delivery & NDR Updates
                     </h3>
-                    <div class="space-y-4">
-                        <div class="flex gap-3">
-                            <div class="mt-1 min-w-[32px] h-8 bg-amber-50 text-amber-600 rounded flex items-center justify-center text-xs font-bold">2</div>
-                            <div>
-                                <p class="text-xs font-medium text-slate-900">Attempt Failed: AWB-10922</p>
-                                <p class="text-[11px] text-slate-500 mt-0.5">Reason: Consignee premises closed (UD-002)</p>
-                                <p class="text-[10px] text-slate-400 mt-1">Rider: Vikram Singh (RID-882)</p>
-                            </div>
-                            <span class="ml-auto text-[10px] text-slate-400">10m</span>
-                        </div>
-                        <div class="flex gap-3">
-                            <div class="mt-1 min-w-[32px] h-8 bg-blue-50 text-blue-600 rounded flex items-center justify-center text-xs font-bold">1</div>
-                            <div>
-                                <p class="text-xs font-medium text-slate-900">OTP Verified: AWB-88219</p>
-                                <p class="text-[11px] text-slate-500 mt-0.5">Successful delivery at Dwarka Sector 12</p>
-                                <p class="text-[10px] text-slate-400 mt-1">Rider: Rahul K. (RID-112)</p>
-                            </div>
-                            <span class="ml-auto text-[10px] text-slate-400">22m</span>
-                        </div>
-                        <div class="flex gap-3">
-                            <div class="mt-1 min-w-[32px] h-8 bg-rose-50 text-rose-600 rounded flex items-center justify-center text-xs font-bold">R</div>
-                            <div>
-                                <p class="text-xs font-medium text-slate-900">RTO Triggered: AWB-77102</p>
-                                <p class="text-[11px] text-slate-500 mt-0.5">Reason: Address incomplete; escalation to hub lead</p>
-                                <p class="text-[10px] text-slate-400 mt-1">Rider: Meera S. (RID-214)</p>
-                            </div>
-                            <span class="ml-auto text-[10px] text-slate-400">35m</span>
-                        </div>
-                        <div class="flex gap-3">
-                            <div class="mt-1 min-w-[32px] h-8 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center text-xs font-bold">C</div>
-                            <div>
-                                <p class="text-xs font-medium text-slate-900">Cash Handed Over: HUB-MUM-CEN</p>
-                                <p class="text-[11px] text-slate-500 mt-0.5">₹92,400 deposited; COD variance check in progress</p>
-                                <p class="text-[10px] text-slate-400 mt-1">Handled by: Cashier Desk</p>
-                            </div>
-                            <span class="ml-auto text-[10px] text-slate-400">58m</span>
-                        </div>
+                    <div id="recentUpdatesList" class="space-y-4">
+                        <div class="text-xs text-slate-500">Loading updates…</div>
                     </div>
                 </div>
 
@@ -471,20 +437,31 @@
                         <iconify-icon icon="solar:wallet-linear" class="text-slate-400"></iconify-icon>
                         COD Reconciliation
                     </h3>
-                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 mb-3">
-                        <div>
-                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Collected Today</p>
-                            <p class="text-lg font-bold text-slate-900">₹145,200</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Collected (Delivered)</p>
+                            <p id="miniCodCollected" class="text-lg font-bold text-slate-900">—</p>
+                            <p class="text-[10px] text-slate-400 mt-1">From delivered COD shipments</p>
                         </div>
-                        <div class="text-right">
-                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">Pending Bank Deposit</p>
-                            <p class="text-lg font-bold text-orange-600">₹12,400</p>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Outstanding</p>
+                            <p id="miniCodOutstanding" class="text-lg font-bold text-orange-600">—</p>
+                            <p class="text-[10px] text-slate-400 mt-1">COD not yet delivered</p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Shipments</p>
+                            <p id="miniCodCount" class="text-lg font-bold text-slate-900">—</p>
+                            <p class="text-[10px] text-slate-400 mt-1">collectable_value &gt; 0</p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">Last Refresh</p>
+                            <p id="miniLastRefresh" class="text-lg font-bold text-slate-900">—</p>
+                            <p class="text-[10px] text-slate-400 mt-1">From current fetch</p>
                         </div>
                     </div>
-                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div class="bg-emerald-500 h-full rounded-full" style="width: 92%"></div>
+                    <div class="mt-4 text-xs">
+                        <a href="cod.html" class="text-blue-600 font-semibold hover:underline">Open COD page</a>
                     </div>
-                    <p class="text-[10px] text-slate-400 mt-2 text-center">92% deposited to hub account</p>
                 </div>
             </div>
 
@@ -869,6 +846,91 @@
             renderTable(rows);
             computeAndRenderMetrics(rows);
             renderCharts(rows);
+            renderSecondaryPanels(rows);
+        }
+
+        /**
+         * Render panels that must never contain mock data:
+         * - sidebar exception badge
+         * - recent updates feed
+         * - COD mini reconciliation card
+         * @param {Shipment[]} rows
+         */
+        function renderSecondaryPanels(rows) {
+            const data = window.DashboardData;
+            const escape = data?.escapeHtml || escapeHtml;
+            const format = data?.formatCurrency || formatCurrency;
+            const getRowDate = data?.getRowDate || ((r) => {
+                const raw = r.created_at || r.order_date || r.updated_at || r.edd;
+                if (!raw) return null;
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? null : d;
+            });
+            const relativeTime = data?.relativeTime || ((d) => d ? '' : '');
+            const statusPillHtml = data?.statusPillHtml || ((s, c) => getStatusPill(s, c));
+
+            // Sidebar badge: exception count from rows
+            const badge = document.getElementById('exceptionsBadge');
+            if (badge) {
+                const exceptionCodes = new Set(['UD', 'RTO', 'NDR']);
+                const count = rows.filter(r => exceptionCodes.has(String(r.statusCode || '').toUpperCase())).length;
+                badge.textContent = String(count);
+                badge.classList.toggle('hidden', count <= 0);
+            }
+
+            // Recent updates (derived from the most recent rows)
+            const list = document.getElementById('recentUpdatesList');
+            if (list) {
+                const now = new Date();
+                const sorted = [...rows].sort((a, b) => {
+                    const da = getRowDate(a)?.getTime() || 0;
+                    const db = getRowDate(b)?.getTime() || 0;
+                    return db - da;
+                });
+                const top = sorted.slice(0, 6);
+                if (top.length === 0) {
+                    list.innerHTML = `<div class="text-xs text-slate-500">No updates available.</div>`;
+                } else {
+                    list.innerHTML = top.map((r) => {
+                        const awb = escape(r.awbNumber || '—');
+                        const title = `${escape(r.statusDescription || r.statusCode || 'Update')}: ${awb}`;
+                        const reason = escape(r.last_udReason || r.first_udReason || '');
+                        const rider = escape(r.riderName || 'Unassigned');
+                        const t = relativeTime(getRowDate(r), now) || '';
+                        const chip = statusPillHtml(r.statusDescription, r.statusCode);
+                        return `
+                            <div class="flex gap-3 items-start">
+                                <div class="mt-0.5">${chip}</div>
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold text-slate-900 truncate">${title}</p>
+                                    ${reason ? `<p class="text-[11px] text-slate-500 mt-0.5 truncate">Reason: ${reason}</p>` : ''}
+                                    <p class="text-[10px] text-slate-400 mt-1">Rider: ${rider}</p>
+                                </div>
+                                <span class="ml-auto text-[10px] text-slate-400">${escape(t)}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
+            // COD mini reconciliation (computed from shipments)
+            const miniCodCollected = document.getElementById('miniCodCollected');
+            const miniCodOutstanding = document.getElementById('miniCodOutstanding');
+            const miniCodCount = document.getElementById('miniCodCount');
+            const miniLastRefresh = document.getElementById('miniLastRefresh');
+
+            const deliveredCodes = new Set(['DEL']);
+            const codRows = rows.filter(r => (Number(r.collectable_value) || 0) > 0);
+            const deliveredCod = codRows.filter(r => deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
+            const outstandingCod = codRows.filter(r => !deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
+
+            const collectedAmount = deliveredCod.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
+            const outstandingAmount = outstandingCod.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
+
+            if (miniCodCollected) miniCodCollected.textContent = format(collectedAmount);
+            if (miniCodOutstanding) miniCodOutstanding.textContent = format(outstandingAmount);
+            if (miniCodCount) miniCodCount.textContent = String(codRows.length);
+            if (miniLastRefresh) miniLastRefresh.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
         }
 
         /**

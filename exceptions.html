@@ -12,6 +12,7 @@
     <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvcmNteGFjcHlwaHN2and0bWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3OTk5OTMsImV4cCI6MjA4NDM3NTk5M30.l-nvIX7nkuRBhLoT-T6QlYtQNpd1JarFCqX8D-HRXt4">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="assets/supabase-runtime.js"></script>
+    <script src="assets/data.js"></script>
     <script src="assets/nav.js" defer></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -80,8 +81,8 @@
             <div class="flex items-center gap-3 w-full p-2 rounded-lg border border-slate-200 bg-slate-50">
                 <img src="https://ui-avatars.com/api/?name=Exceptions&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
                 <div class="flex flex-col min-w-0">
-                    <span id="authUserEmailSidebar" class="text-xs font-semibold text-slate-900 truncate">—</span>
-                    <span class="text-[10px] text-slate-500 truncate">Authenticated</span>
+                    <span class="text-xs font-semibold text-slate-900 truncate">UrbaneBolt</span>
+                    <span class="text-[10px] text-slate-500 truncate">Public dashboard</span>
                 </div>
             </div>
         </div>
@@ -108,28 +109,61 @@
             <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
                 <div class="flex items-start justify-between">
                     <div>
-                        <h2 class="text-sm font-bold text-slate-900">Exceptions Queue</h2>
-                        <p class="text-xs text-slate-500 mt-1">This page is wired and protected. Add UD/RTO/NDR queues here.</p>
+                        <h2 class="text-sm font-bold text-slate-900">Exceptions Queue (Supabase)</h2>
+                        <p class="text-xs text-slate-500 mt-1">Filtered from the <span class="font-semibold text-slate-700">shipments</span> table (UD/RTO/NDR). No mock values.</p>
                     </div>
                     <a href="index.html" class="text-xs font-semibold text-blue-600 hover:underline">Back to Dashboard</a>
                 </div>
 
-                <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="mt-5 grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Undelivered</p>
-                        <p class="mt-2 text-sm font-bold text-slate-900">Coming soon</p>
-                        <p class="mt-1 text-xs text-slate-500">First attempt failures and reasons.</p>
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Undelivered (UD)</p>
+                        <p id="udCount" class="mt-2 text-xl font-bold text-amber-700">—</p>
+                        <p class="mt-1 text-xs text-slate-500">statusCode = UD</p>
                     </div>
                     <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
                         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">RTO</p>
-                        <p class="mt-2 text-sm font-bold text-slate-900">Coming soon</p>
-                        <p class="mt-1 text-xs text-slate-500">RTO triggers and approvals.</p>
+                        <p id="rtoCount" class="mt-2 text-xl font-bold text-rose-700">—</p>
+                        <p class="mt-1 text-xs text-slate-500">statusCode = RTO</p>
                     </div>
                     <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
                         <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">NDR</p>
-                        <p class="mt-2 text-sm font-bold text-slate-900">Coming soon</p>
-                        <p class="mt-1 text-xs text-slate-500">Retry workflows and outcomes.</p>
+                        <p id="ndrCount" class="mt-2 text-xl font-bold text-slate-900">—</p>
+                        <p class="mt-1 text-xs text-slate-500">statusCode = NDR</p>
                     </div>
+                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
+                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Last Refresh</p>
+                        <p id="exRefresh" class="mt-2 text-xl font-bold text-slate-900">—</p>
+                        <p class="mt-1 text-xs text-slate-500">From current fetch</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl premium-border premium-shadow flex flex-col overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Exception Shipments</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Latest UD/RTO/NDR records (from Supabase)</p>
+                    </div>
+                    <span id="exceptionsTableStatus" class="text-xs text-slate-500">Loading…</span>
+                </div>
+                <div class="overflow-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">AWB</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Customer</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Route</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Reason</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Rider</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Status</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Age</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exceptionsTableBody" class="divide-y divide-slate-100 text-sm">
+                            <tr><td colspan="7" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">Loading…</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -141,7 +175,66 @@
             currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
         }
 
-        // Public mode: no auth required.
+        (async function loadExceptions() {
+            const data = window.DashboardData;
+            const escape = data?.escapeHtml || ((v) => String(v));
+
+            const tableStatus = document.getElementById('exceptionsTableStatus');
+            const tbody = document.getElementById('exceptionsTableBody');
+
+            const res = data?.fetchShipmentsSafe ? await data.fetchShipmentsSafe({ limit: 500 }) : { rows: [], error: 'Data helper not loaded' };
+            if (res.error) {
+                if (tableStatus) tableStatus.textContent = `Supabase error: ${res.error}`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">${escape(res.error)}</td></tr>`;
+                return;
+            }
+
+            const rows = res.rows || [];
+            const codeOf = (r) => String(r.statusCode || '').toUpperCase();
+            const ud = rows.filter(r => codeOf(r) === 'UD');
+            const rto = rows.filter(r => codeOf(r) === 'RTO');
+            const ndr = rows.filter(r => codeOf(r) === 'NDR');
+
+            document.getElementById('udCount').textContent = String(ud.length);
+            document.getElementById('rtoCount').textContent = String(rto.length);
+            document.getElementById('ndrCount').textContent = String(ndr.length);
+            document.getElementById('exRefresh').textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+            const exceptionCodes = new Set(['UD', 'RTO', 'NDR']);
+            const exceptions = rows.filter(r => exceptionCodes.has(codeOf(r)));
+            const getDate = data?.getRowDate || (() => null);
+            const age = data?.relativeTime || (() => '');
+
+            const sorted = [...exceptions].sort((a, b) => (getDate(b)?.getTime() || 0) - (getDate(a)?.getTime() || 0));
+            const top = sorted.slice(0, 100);
+            if (tableStatus) tableStatus.textContent = `Showing ${top.length} / ${exceptions.length}`;
+
+            if (!tbody) return;
+            if (top.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">No exceptions found.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = top.map((r) => {
+                const pill = data?.statusPillHtml ? data.statusPillHtml(r.statusDescription, r.statusCode) : escape(r.statusDescription || r.statusCode || '—');
+                const reason = r.last_udReason || r.first_udReason || '—';
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-3 px-6 font-mono text-xs font-semibold text-slate-700">
+                            <a class="text-blue-600 hover:underline" href="shipment.html?awb=${encodeURIComponent(String(r.awbNumber || ''))}">
+                                ${escape(r.awbNumber || '—')}
+                            </a>
+                        </td>
+                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape(r.customerName || '—')}</td>
+                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape((r.origin || '—') + ' → ' + (r.destination || '—'))}</td>
+                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape(reason)}</td>
+                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape(r.riderName || 'Unassigned')}</td>
+                        <td class="py-3 px-6">${pill}</td>
+                        <td class="py-3 px-6 text-[11px] text-slate-500">${escape(age(getDate(r)))}</td>
+                    </tr>
+                `;
+            }).join('');
+        })();
     </script>
 </body>
 </html>
