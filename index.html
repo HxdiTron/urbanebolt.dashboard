@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Command Center - Enterprise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <!-- Supabase (required for live data fetching) -->
+    <meta name="supabase-url" content="https://eorcmxacpyphsvjwtmbc.supabase.co">
+    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvcmNteGFjcHlwaHN2and0bWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3OTk5OTMsImV4cCI6MjA4NDM3NTk5M30.l-nvIX7nkuRBhLoT-T6QlYtQNpd1JarFCqX8D-HRXt4">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/supabase-runtime.js"></script>
+    <script src="assets/nav.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f8fafc; /* Slate 50 */
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+        
+        .premium-shadow {
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03);
+        }
+
+        .premium-border {
+            border: 1px solid #e2e8f0;
+        }
+
+        /* Chart animations */
+        @keyframes grow-bar { from { height: 0; } to { height: var(--h); } }
+        .chart-bar { animation: grow-bar 1s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+
+        /* Status storytelling (fast visual scan in table) */
+        tr.status-row td:first-child { position: relative; }
+        tr.status-row td:first-child::before {
+            content: "";
+            position: absolute;
+            left: 12px;            /* sits inside the existing px-6 padding */
+            top: 10px;
+            bottom: 10px;
+            width: 3px;
+            border-radius: 999px;
+            background: #cbd5e1;   /* slate-300 */
+        }
+        tr.status--delivered td:first-child::before { background: #10b981; } /* emerald-500 */
+        tr.status--in-progress td:first-child::before { background: #3b82f6; } /* blue-500 */
+        tr.status--cancelled td:first-child::before { background: #f43f5e; } /* rose-500 */
+        tr.status--exception td:first-child::before { background: #f59e0b; } /* amber-500 */
+        tr.status--other td:first-child::before { background: #94a3b8; } /* slate-400 */
+    </style>
+</head>
+<body class="text-slate-600 antialiased h-screen flex overflow-hidden selection:bg-slate-200 selection:text-slate-900">
+
+    <!-- Sidebar -->
+    <aside class="w-72 bg-white border-r border-slate-200 flex flex-col justify-between z-20 hidden md:flex shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
+        <div>
+            <!-- Logo Area -->
+            <div class="h-16 flex items-center px-6 border-b border-slate-100">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center">
+                        <iconify-icon icon="solar:box-minimalistic-linear" width="20" stroke-width="1.5"></iconify-icon>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-bold tracking-tight text-slate-900 text-sm leading-none">URABNEBOLT</span>
+                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="p-4 space-y-1">
+                <div class="px-3 pb-2 pt-2">
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Core Data</p>
+                </div>
+                
+                <a href="index.html" data-nav-href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
+                    <iconify-icon icon="solar:widget-2-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                    Overview
+                </a>
+                
+                <a href="manifest.html" data-nav-href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
+                    <iconify-icon icon="solar:clipboard-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                    Master Manifest
+                </a>
+
+                <a href="riders.html" data-nav-href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
+                    <iconify-icon icon="solar:user-hand-up-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                    Rider Allocation
+                </a>
+
+                <div class="px-3 pb-2 pt-6">
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">NDR & Finance</p>
+                </div>
+
+                <a href="cod.html" data-nav-href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
+                    <iconify-icon icon="solar:bill-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                    COD Reconciliation
+                </a>
+                
+                <a href="exceptions.html" data-nav-href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
+                    <iconify-icon icon="solar:danger-triangle-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                    RTO & Exceptions
+                    <span class="ml-auto bg-rose-100 text-rose-600 py-0.5 px-2 rounded-full text-[10px] font-semibold">12</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- User Profile -->
+        <div class="p-4 border-t border-slate-100">
+            <button class="flex items-center gap-3 w-full p-2 hover:bg-slate-50 rounded-lg transition-colors text-left border border-transparent hover:border-slate-200">
+                <img src="https://ui-avatars.com/api/?name=Hub+Manager&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
+                <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-slate-900">Hub Manager</span>
+                    <span class="text-[10px] text-slate-500">MUM-Central-01</span>
+                </div>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-50/50">
+        
+        <!-- Header -->
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
+            <div class="flex items-center gap-4">
+                <h1 class="text-lg font-semibold text-slate-900 tracking-tight">Dashboard</h1>
+                <div class="h-4 w-px bg-slate-200"></div>
+                <div class="flex items-center gap-2 text-xs text-slate-500 bg-slate-100/50 px-2 py-1 rounded-md border border-slate-200">
+                    <iconify-icon icon="solar:calendar-linear" width="14"></iconify-icon>
+                    <span id="currentDate"></span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="relative group">
+                    <iconify-icon icon="solar:magnifer-linear" class="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-slate-600 transition-colors" width="16"></iconify-icon>
+                    <input
+                        data-awb-search
+                        type="text"
+                        placeholder="Search by AWB number"
+                        class="w-80 bg-slate-50 border border-slate-200 text-sm rounded-lg pl-9 pr-9 py-2 focus:outline-none focus:ring-2 focus:ring-slate-200 focus:bg-white transition-all placeholder:text-slate-400 text-slate-900"
+                        autocomplete="off"
+                    >
+                    <button
+                        type="button"
+                        data-clear-search
+                        class="absolute inset-y-1 right-1 px-2 text-[11px] font-semibold text-slate-500 rounded-md hover:bg-slate-100 transition-colors"
+                        aria-label="Clear search"
+                    >
+                        Clear
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Scrollable Dashboard Area -->
+        <div class="flex-1 overflow-y-auto p-8 space-y-8">
+            
+            <!-- High Level Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Metric 1: Total Shipments Today -->
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+                            <iconify-icon icon="solar:hand-money-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Total Shipments Today</span>
+                    </div>
+                    <h3 id="metric-total-today" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
+                    <p class="text-xs text-slate-400 mt-1">All shipments created for the current day</p>
+                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-blue-600 h-1.5 rounded-full" style="width: 65%"></div>
+                    </div>
+                </div>
+
+                <!-- Metric 2: Delivered Shipments Today -->
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-violet-50 text-violet-600 rounded-lg">
+                            <iconify-icon icon="solar:box-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Delivered Today</span>
+                    </div>
+                    <h3 id="metric-delivered-today" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
+                    <p class="text-xs text-slate-400 mt-1">Shipments with final status Delivered</p>
+                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-violet-600 h-1.5 rounded-full" style="width: 82%"></div>
+                    </div>
+                </div>
+
+                <!-- Metric 3: In-Transit Shipments -->
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <iconify-icon icon="solar:verified-check-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">In-Transit Shipments</span>
+                    </div>
+                    <h3 id="metric-intransit" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
+                    <p class="text-xs text-slate-400 mt-1">Currently moving in the network</p>
+                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-emerald-600 h-1.5 rounded-full" style="width: 88%"></div>
+                    </div>
+                </div>
+
+                <!-- Metric 4: Undelivered / Failed -->
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-rose-50 text-rose-600 rounded-lg">
+                            <iconify-icon icon="solar:siren-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Undelivered / Failed</span>
+                    </div>
+                    <h3 id="metric-undelivered" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
+                    <p class="text-xs text-slate-400 mt-1">Attempts failed, UD, RTO, or cancelled</p>
+                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="bg-rose-500 h-1.5 rounded-full" style="width: 15%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secondary Metrics Row (Delivery Rate, COD, Revenue) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Delivery Success Rate -->
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <iconify-icon icon="solar:chart-outline" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Delivery Success Rate</span>
+                    </div>
+                    <h3 id="metric-dsr" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0%</h3>
+                    <p class="text-xs text-slate-400 mt-1">Delivered vs total shipments for the day</p>
+                </div>
+
+                <!-- COD Collected Today -->
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+                            <iconify-icon icon="solar:wallet-linear" width="22"></iconify-icon>
+                        </div>
+                    <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">COD Collected Today</span>
+                    </div>
+                    <h3 id="metric-cod-collected" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">₹0</h3>
+                    <p class="text-xs text-slate-400 mt-1">Cash collected on successful deliveries</p>
+                </div>
+
+                <!-- Amount Earned Today -->
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                            <iconify-icon icon="solar:card-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Amount Earned Today</span>
+                    </div>
+                    <h3 id="metric-earned" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">₹0</h3>
+                    <p class="text-xs text-slate-400 mt-1">Total declared value of delivered shipments</p>
+                </div>
+            </div>
+
+            <!-- Insights (Charts) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Status Distribution -->
+                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Status Mix</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Distribution across key shipment states</p>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Live</span>
+                    </div>
+                    <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5 items-center">
+                        <div class="flex items-center justify-center">
+                            <svg id="chart-status-donut" viewBox="0 0 120 120" class="w-36 h-36">
+                                <circle cx="60" cy="60" r="44" fill="none" stroke="#e2e8f0" stroke-width="14"></circle>
+                                <!-- segments injected by JS -->
+                                <circle cx="60" cy="60" r="32" fill="white"></circle>
+                                <text id="chart-status-center" x="60" y="60" text-anchor="middle" dominant-baseline="middle" class="fill-slate-900" style="font-size:12px;font-weight:700;">0</text>
+                                <text x="60" y="74" text-anchor="middle" dominant-baseline="middle" class="fill-slate-500" style="font-size:9px;font-weight:600;">Shipments</text>
+                            </svg>
+                        </div>
+                        <div id="chart-status-legend" class="space-y-2 text-xs">
+                            <!-- legend injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7-Day Volume Trend -->
+                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">7‑Day Volume Trend</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Shipments created per day</p>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Last 7d</span>
+                    </div>
+                    <div class="mt-6">
+                        <div id="chart-trend" class="flex items-end gap-2 h-40">
+                            <!-- bars injected by JS -->
+                        </div>
+                        <div id="chart-trend-labels" class="mt-3 grid grid-cols-7 gap-2 text-[10px] text-slate-400">
+                            <!-- labels injected by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COD Split -->
+                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">COD vs Prepaid</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Shipment mix by collectable value</p>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Split</span>
+                    </div>
+                    <div class="mt-6 space-y-4">
+                        <div>
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-semibold text-slate-700">COD Shipments</span>
+                                <span id="chart-cod-count" class="font-semibold text-slate-900">0</span>
+                            </div>
+                            <div class="mt-2 w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div id="chart-cod-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-semibold text-slate-700">Prepaid / ₹0 COD</span>
+                                <span id="chart-prepaid-count" class="font-semibold text-slate-900">0</span>
+                            </div>
+                            <div class="mt-2 w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div id="chart-prepaid-bar" class="bg-slate-700 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-slate-100 text-xs text-slate-500">
+                            <span class="font-semibold text-slate-700">COD collected today:</span>
+                            <span id="chart-cod-collected-inline" class="font-semibold text-slate-900">₹0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Data Table -->
+            <div class="bg-white rounded-xl premium-border premium-shadow flex flex-col overflow-hidden h-[650px]">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Live Shipments</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Real-time status from core database</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="hidden xl:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Legend</span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Delivered
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> In Progress
+                            </span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Cancelled
+                            </span>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
+                                <span class="text-xs font-medium text-slate-500">Service:</span>
+                                <select class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0 cursor-pointer">
+                                    <option>All</option>
+                                    <option>Surface</option>
+                                    <option>Air Express</option>
+                                </select>
+                            </div>
+                            <button class="px-3 py-1.5 text-xs font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-sm flex items-center gap-2">
+                                <iconify-icon icon="solar:export-linear"></iconify-icon> Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex-1 overflow-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">AWB</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Customer</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Route (Org - Dest)</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Service Details</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">Value (COD/Dec)</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Status</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Rider / Update</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-sm" id="shipmentTableBody">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-xs text-slate-500">
+                    <span id="tableStatus">Loading…</span>
+                    <div class="flex gap-1">
+                        <button class="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50">
+                            <iconify-icon icon="solar:alt-arrow-left-linear"></iconify-icon>
+                        </button>
+                        <button class="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50">
+                            <iconify-icon icon="solar:alt-arrow-right-linear"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Secondary Info Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Recent Updates (Log) -->
+                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                    <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <iconify-icon icon="solar:history-linear" class="text-slate-400"></iconify-icon>
+                        Recent Delivery & NDR Updates
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="flex gap-3">
+                            <div class="mt-1 min-w-[32px] h-8 bg-amber-50 text-amber-600 rounded flex items-center justify-center text-xs font-bold">2</div>
+                            <div>
+                                <p class="text-xs font-medium text-slate-900">Attempt Failed: AWB-10922</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Reason: Consignee premises closed (UD-002)</p>
+                                <p class="text-[10px] text-slate-400 mt-1">Rider: Vikram Singh (RID-882)</p>
+                            </div>
+                            <span class="ml-auto text-[10px] text-slate-400">10m</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="mt-1 min-w-[32px] h-8 bg-blue-50 text-blue-600 rounded flex items-center justify-center text-xs font-bold">1</div>
+                            <div>
+                                <p class="text-xs font-medium text-slate-900">OTP Verified: AWB-88219</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Successful delivery at Dwarka Sector 12</p>
+                                <p class="text-[10px] text-slate-400 mt-1">Rider: Rahul K. (RID-112)</p>
+                            </div>
+                            <span class="ml-auto text-[10px] text-slate-400">22m</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="mt-1 min-w-[32px] h-8 bg-rose-50 text-rose-600 rounded flex items-center justify-center text-xs font-bold">R</div>
+                            <div>
+                                <p class="text-xs font-medium text-slate-900">RTO Triggered: AWB-77102</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Reason: Address incomplete; escalation to hub lead</p>
+                                <p class="text-[10px] text-slate-400 mt-1">Rider: Meera S. (RID-214)</p>
+                            </div>
+                            <span class="ml-auto text-[10px] text-slate-400">35m</span>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="mt-1 min-w-[32px] h-8 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center text-xs font-bold">C</div>
+                            <div>
+                                <p class="text-xs font-medium text-slate-900">Cash Handed Over: HUB-MUM-CEN</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">₹92,400 deposited; COD variance check in progress</p>
+                                <p class="text-[10px] text-slate-400 mt-1">Handled by: Cashier Desk</p>
+                            </div>
+                            <span class="ml-auto text-[10px] text-slate-400">58m</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financial Mini-View -->
+                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                    <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <iconify-icon icon="solar:wallet-linear" class="text-slate-400"></iconify-icon>
+                        COD Reconciliation
+                    </h3>
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 mb-3">
+                        <div>
+                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Collected Today</p>
+                            <p class="text-lg font-bold text-slate-900">₹145,200</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">Pending Bank Deposit</p>
+                            <p class="text-lg font-bold text-orange-600">₹12,400</p>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div class="bg-emerald-500 h-full rounded-full" style="width: 92%"></div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-2 text-center">92% deposited to hub account</p>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        /**
+         * @typedef {Object} Shipment
+         * @property {string} awbNumber
+         * @property {string=} order_number
+         * @property {string=} customerName
+         * @property {string=} customerCode
+         * @property {string=} origin
+         * @property {string=} originPincode
+         * @property {string=} destination
+         * @property {string=} destinationPincode
+         * @property {number=} collectable_value
+         * @property {number=} declared_value
+         * @property {string=} serviceType
+         * @property {string=} product_type
+         * @property {string=} statusDescription
+         * @property {string=} statusCode
+         * @property {string=} edd
+         * @property {string=} riderName
+         * @property {number=} attemptCount
+         * @property {string=} first_udReason
+         * @property {string=} last_udReason
+         */
+
+        /**
+         * @typedef {Object} SupabaseResponse
+         * @property {Shipment[]=} data
+         * @property {{ message?: string } | null} error
+         */
+
+        /** @type {Shipment[]} */
+        let currentRows = [];
+        /** @type {number} */
+        let requestSequence = 0;
+        /** @type {AbortController | null} */
+        let activeController = null;
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        let debounceTimer = null;
+
+        /** @type {HTMLTableSectionElement | null} */
+        const tbody = document.getElementById('shipmentTableBody');
+        /** @type {HTMLSpanElement | null} */
+        const tableStatus = document.getElementById('tableStatus');
+        /** @type {HTMLElement | null} */
+        const metricTotalToday = document.getElementById('metric-total-today');
+        /** @type {HTMLElement | null} */
+        const metricDeliveredToday = document.getElementById('metric-delivered-today');
+        /** @type {HTMLElement | null} */
+        const metricInTransit = document.getElementById('metric-intransit');
+        /** @type {HTMLElement | null} */
+        const metricUndelivered = document.getElementById('metric-undelivered');
+        /** @type {HTMLElement | null} */
+        const metricDsr = document.getElementById('metric-dsr');
+        /** @type {HTMLElement | null} */
+        const metricCodCollected = document.getElementById('metric-cod-collected');
+        /** @type {HTMLElement | null} */
+        const metricEarned = document.getElementById('metric-earned');
+        /** @type {HTMLInputElement | null} */
+        const searchInput = document.querySelector('[data-awb-search]');
+        /** @type {HTMLButtonElement | null} */
+        const clearButton = document.querySelector('[data-clear-search]');
+        /** @type {any} */
+        const supabaseClient = window.supabaseClient || window.supabase;
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
+        }
+
+        /**
+         * Escape dynamic strings to avoid XSS when rendering HTML.
+         * @param {any} value
+         */
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setMetricText(element, text) {
+            if (element) {
+                element.textContent = text;
+            }
+        }
+
+        /**
+         * @param {string=} status
+         * @param {string=} code
+         * @returns {'delivered'|'in-progress'|'cancelled'|'exception'|'other'}
+         */
+        function getStatusCategory(status, code) {
+            const c = String(code || '').trim().toUpperCase();
+            const s = String(status || '').trim().toLowerCase();
+
+            const deliveredCodes = new Set(['DEL', 'DLV', 'DELIVERED']);
+            const inProgressCodes = new Set(['INT', 'OFD', 'OFD1', 'OFD2', 'IT', 'INTRANSIT']);
+            const cancelledCodes = new Set(['CNL', 'CAN', 'CX', 'CANC', 'CNCL', 'CANCELED', 'CANCELLED']);
+            const exceptionCodes = new Set(['UD', 'RTO', 'NDR', 'FAILED', 'FAIL']);
+
+            if (deliveredCodes.has(c) || s.includes('delivered')) return 'delivered';
+            if (cancelledCodes.has(c) || s.includes('cancel')) return 'cancelled';
+            if (exceptionCodes.has(c) || s.includes('undeliver') || s.includes('failed') || s.includes('rto') || s.includes('ndr')) return 'exception';
+            if (inProgressCodes.has(c) || s.includes('in progress') || s.includes('in-transit') || s.includes('in transit') || s.includes('out for delivery') || s.includes('transit')) return 'in-progress';
+            return 'other';
+        }
+
+        /**
+         * @param {string=} status
+         * @param {string=} code
+         */
+        function getStatusPill(status, code) {
+            const category = getStatusCategory(status, code);
+            const theme = {
+                delivered: { pill: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60', dot: 'bg-emerald-500' },
+                'in-progress': { pill: 'bg-blue-50 text-blue-700 border border-blue-200/60', dot: 'bg-blue-500' },
+                cancelled: { pill: 'bg-rose-50 text-rose-700 border border-rose-200/60', dot: 'bg-rose-500' },
+                exception: { pill: 'bg-amber-50 text-amber-800 border border-amber-200/60', dot: 'bg-amber-500' },
+                other: { pill: 'bg-slate-100 text-slate-700 border border-slate-200', dot: 'bg-slate-400' }
+            }[category];
+
+            const safeStatus = escapeHtml(status || 'Unknown');
+            const safeCode = escapeHtml((code || '').toString());
+            return `
+                <span class="inline-flex items-center gap-2 px-2 py-1 rounded-md text-xs font-semibold ${theme.pill}" title="${safeCode}">
+                    <span class="w-1.5 h-1.5 rounded-full ${theme.dot}"></span>
+                    ${safeStatus}
+                </span>
+            `;
+        }
+
+        /**
+         * @param {string=} status
+         * @param {string=} code
+         */
+        function getStatusRowClass(status, code) {
+            return `status-row status--${getStatusCategory(status, code)}`;
+        }
+
+        /**
+         * @param {string} text
+         */
+        function setTableStatus(text) {
+            if (!tableStatus) return;
+            tableStatus.textContent = text;
+        }
+
+        function renderSkeletonRows(rowCount = 6) {
+            if (!tbody) return;
+            setTableStatus('Loading…');
+            const skeletonRow = `
+                <tr class="animate-pulse">
+                    <td class="py-4 px-6">
+                        <div class="h-3 w-24 bg-slate-200 rounded mb-2"></div>
+                        <div class="h-2.5 w-28 bg-slate-200 rounded"></div>
+                    </td>
+                    <td class="py-4 px-6">
+                        <div class="h-3 w-36 bg-slate-200 rounded mb-2"></div>
+                        <div class="h-2.5 w-32 bg-slate-200 rounded"></div>
+                    </td>
+                    <td class="py-4 px-6">
+                        <div class="h-3 w-20 bg-slate-200 rounded mb-2"></div>
+                        <div class="h-2.5 w-24 bg-slate-200 rounded"></div>
+                    </td>
+                    <td class="py-4 px-6">
+                        <div class="h-3 w-20 bg-slate-200 rounded mb-2"></div>
+                        <div class="h-2.5 w-24 bg-slate-200 rounded ml-auto"></div>
+                    </td>
+                    <td class="py-4 px-6">
+                        <div class="h-3 w-20 bg-slate-200 rounded mb-2"></div>
+                        <div class="h-2.5 w-24 bg-slate-200 rounded"></div>
+                    </td>
+                    <td class="py-4 px-6">
+                        <div class="h-3 w-28 bg-slate-200 rounded mb-2"></div>
+                        <div class="h-2.5 w-16 bg-slate-200 rounded"></div>
+                    </td>
+                    <td class="py-4 px-6">
+                        <div class="h-3 w-24 bg-slate-200 rounded mb-2"></div>
+                        <div class="h-2.5 w-24 bg-slate-200 rounded"></div>
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML = Array.from({ length: rowCount }).map(() => skeletonRow).join('');
+        }
+
+        function renderEmptyState(message) {
+            if (!tbody) return;
+            setTableStatus(message);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">
+                        ${escapeHtml(message)}
+                    </td>
+                </tr>
+            `;
+        }
+
+        /**
+         * @param {string} message
+         */
+        function renderError(message) {
+            if (!tbody) return;
+            setTableStatus(message);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">
+                        ${escapeHtml(message)}
+                    </td>
+                </tr>
+            `;
+        }
+
+        /**
+         * @param {Shipment[]} rows
+         */
+        function renderTable(rows) {
+            if (!tbody) return;
+            if (!rows.length) {
+                renderEmptyState("No shipment found for this AWB");
+                return;
+            }
+            setTableStatus(`Showing ${rows.length} shipment${rows.length === 1 ? '' : 's'}`);
+
+            tbody.innerHTML = rows.map(row => `
+                <tr class="${getStatusRowClass(row.statusDescription, row.statusCode)} hover:bg-slate-50 transition-colors group cursor-pointer border-b border-slate-50 last:border-0" data-status-category="${getStatusCategory(row.statusDescription, row.statusCode)}">
+                    <td class="py-3 px-6">
+                        <button type="button" data-awb-link="${escapeHtml(row.awbNumber)}" class="font-mono text-xs font-semibold text-blue-600 group-hover:underline focus:outline-none focus:text-blue-700">
+                            ${escapeHtml(row.awbNumber)}
+                        </button>
+                    </td>
+                    <td class="py-3 px-6">
+                        <div class="flex flex-col">
+                            <span class="text-[11px] font-medium text-slate-600 mt-0.5">${escapeHtml(row.customerName || '—')}</span>
+                            <span class="text-[10px] text-slate-400 mt-0.5 font-mono">${row.order_number ? `Ord: ${escapeHtml(row.order_number)}` : ''}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-6">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2 text-xs text-slate-700 font-medium">
+                                <span>${escapeHtml(row.origin || '—')}</span>
+                                <iconify-icon icon="solar:arrow-right-linear" class="text-slate-300"></iconify-icon>
+                                <span>${escapeHtml(row.destination || '—')}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(row.originPincode || '—')} -> ${escapeHtml(row.destinationPincode || '—')}</div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-6">
+                         <div class="flex flex-col gap-1">
+                            <span class="inline-flex w-fit items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                ${escapeHtml(row.serviceType || '—')}
+                            </span>
+                            <span class="text-[10px] text-slate-500">${escapeHtml(row.product_type || '—')}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-6 text-right">
+                        <div class="flex flex-col items-end">
+                            <span class="text-xs font-bold text-slate-900">${formatCurrency(row.collectable_value)}</span>
+                            <span class="text-[10px] text-slate-400">Dec: ${formatCurrency(row.declared_value)}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-6">
+                        <div class="flex flex-col items-start gap-1">
+                            ${getStatusPill(row.statusDescription, row.statusCode)}
+                            <span class="text-[10px] text-slate-400 ml-1">EDD: ${escapeHtml(row.edd || '—')}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-6">
+                        <div class="flex items-center gap-2">
+                             <div class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-[10px]">
+                                <iconify-icon icon="solar:user-linear"></iconify-icon>
+                             </div>
+                             <div class="flex flex-col">
+                                <span class="text-[11px] font-medium text-slate-700">${escapeHtml(row.riderName || 'Unassigned')}</span>
+                                ${typeof row.attemptCount === 'number' && row.attemptCount > 0 ? `<span class="text-[10px] text-orange-600 font-medium">Attempt: ${row.attemptCount}</span>` : ''}
+                             </div>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * @param {string} awbTerm
+         */
+        async function fetchShipments(awbTerm) {
+            if (!supabaseClient || typeof supabaseClient.from !== 'function') {
+                renderEmptyState("Supabase is not configured. Paste your Supabase *anon/public* key (NOT sb_secret_*) into the <meta name=\"supabase-anon-key\"> tag, then reload.");
+                return;
+            }
+
+            requestSequence += 1;
+            const requestId = requestSequence;
+            activeController?.abort();
+            activeController = new AbortController();
+
+            renderSkeletonRows();
+
+            const trimmed = (awbTerm || "").trim();
+            /** @type {Shipment[]} */
+            let rows = [];
+
+            if (trimmed.length > 0) {
+                const exact = /** @type {SupabaseResponse} */ (await supabaseClient
+                    .from('shipments')
+                    .select('*')
+                    .eq('awbNumber', trimmed)
+                    .abortSignal(activeController.signal));
+
+                if (requestId !== requestSequence) {
+                    return;
+                }
+
+                if (!exact.error && exact.data && exact.data.length > 0) {
+                    rows = exact.data;
+                } else {
+                    const fallback = /** @type {SupabaseResponse} */ (await supabaseClient
+                        .from('shipments')
+                        .select('*')
+                        // awbNumber may be numeric in some schemas; cast to text to support partial match.
+                        .filter('awbNumber::text', 'ilike', `%${trimmed}%`)
+                        .abortSignal(activeController.signal));
+
+                    if (requestId !== requestSequence) {
+                        return;
+                    }
+
+                    if (!fallback.error && fallback.data) {
+                        rows = fallback.data;
+                    } else {
+                        if (fallback?.error) {
+                            console.error('Supabase search (ilike) error', fallback.error);
+                            renderError(`Supabase error: ${fallback.error.message || 'Unknown error'}`);
+                        } else {
+                            renderEmptyState("No shipment found for this AWB");
+                        }
+                        return;
+                    }
+                }
+            } else {
+                const response = /** @type {SupabaseResponse} */ (await supabaseClient
+                    .from('shipments')
+                    .select('*')
+                    .abortSignal(activeController.signal));
+
+                if (requestId !== requestSequence) {
+                    return;
+                }
+
+                if (!response.error && response.data) {
+                    rows = response.data;
+                } else {
+                    if (response?.error) {
+                        console.error('Supabase fetch all error', response.error);
+                        renderError(`Supabase error: ${response.error.message || 'Unknown error'}`);
+                    } else {
+                        renderEmptyState("No shipment found for this AWB");
+                    }
+                    return;
+                }
+            }
+
+            currentRows = rows;
+            if (requestId !== requestSequence) {
+                return;
+            }
+            if (trimmed.length === 0 && rows.length === 0) {
+                renderEmptyState("No shipments available (or access is blocked by RLS).");
+                return;
+            }
+            if (trimmed.length > 0 && rows.length === 0) {
+                renderEmptyState("No shipment found for this AWB");
+                return;
+            }
+            renderTable(rows);
+            computeAndRenderMetrics(rows);
+            renderCharts(rows);
+        }
+
+        /**
+         * Compute "today" logistics metrics (counts and amounts).
+         * Gracefully handles missing date fields by treating undated rows as "today".
+         * @param {Shipment[]} rows
+         */
+        function computeAndRenderMetrics(rows) {
+            const deliveredCodes = ['DEL'];
+            const inTransitCodes = ['INT', 'OFD', 'OFD1', 'OFD2'];
+            const undeliveredCodes = ['UD', 'RTO', 'CNL', 'CAN', 'CX', 'CANC', 'CNCL', 'NDR'];
+
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            /**
+             * @param {Shipment} row
+             */
+            function getRowDate(row) {
+                const raw = row.created_at || row.order_date || row.edd;
+                if (!raw) return null;
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? null : d;
+            }
+
+            /** @type {Shipment[]} */
+            const todayRows = [];
+
+            rows.forEach((row) => {
+                const d = getRowDate(row);
+                if (!d) {
+                    // If date is missing, keep it in today's bucket so we still show metrics.
+                    todayRows.push(row);
+                    return;
+                }
+                if (d >= startOfToday) {
+                    todayRows.push(row);
+                }
+            });
+
+            const working = todayRows.length ? todayRows : rows;
+
+            const totalToday = working.length;
+            const deliveredToday = working.filter(r => deliveredCodes.includes(r.statusCode || ''));
+            const inTransitToday = working.filter(r => inTransitCodes.includes(r.statusCode || ''));
+            const undeliveredToday = working.filter(r => {
+                const code = r.statusCode || '';
+                if (undeliveredCodes.includes(code)) return true;
+                if (!deliveredCodes.includes(code) && !inTransitCodes.includes(code) && (r.attemptCount || 0) > 0) {
+                    return true;
+                }
+                return false;
+            });
+
+            const dsr = totalToday ? (deliveredToday.length / totalToday) * 100 : 0;
+
+            const codCollected = deliveredToday.reduce(
+                (acc, r) => acc + (Number(r.collectable_value) || 0),
+                0
+            );
+
+            const amountEarned = deliveredToday.reduce(
+                (acc, r) => acc + (Number(r.declared_value) || 0),
+                0
+            );
+
+            setMetricText(metricTotalToday, String(totalToday));
+            setMetricText(metricDeliveredToday, String(deliveredToday.length));
+            setMetricText(metricInTransit, String(inTransitToday.length));
+            setMetricText(metricUndelivered, String(undeliveredToday.length));
+            setMetricText(metricDsr, `${dsr.toFixed(1)}%`);
+            setMetricText(metricCodCollected, formatCurrency(codCollected));
+            setMetricText(metricEarned, formatCurrency(amountEarned));
+        }
+
+        function renderCharts(rows) {
+            const deliveredCodes = ['DEL'];
+            const inTransitCodes = ['INT', 'OFD', 'OFD1', 'OFD2'];
+            const cancelledCodes = ['CNL', 'CAN', 'CX', 'CANC', 'CNCL'];
+            const exceptionCodes = ['UD', 'RTO', 'NDR'];
+
+            const donut = document.getElementById('chart-status-donut');
+            const donutCenter = document.getElementById('chart-status-center');
+            const legend = document.getElementById('chart-status-legend');
+            const trend = document.getElementById('chart-trend');
+            const trendLabels = document.getElementById('chart-trend-labels');
+            const codCountEl = document.getElementById('chart-cod-count');
+            const prepaidCountEl = document.getElementById('chart-prepaid-count');
+            const codBar = document.getElementById('chart-cod-bar');
+            const prepaidBar = document.getElementById('chart-prepaid-bar');
+            const codCollectedInline = document.getElementById('chart-cod-collected-inline');
+
+            if (!donut || !legend || !trend || !trendLabels || !codBar || !prepaidBar) return;
+
+            // ---- Status Donut (DEL / IN TRANSIT / FAILED) ----
+            const total = rows.length;
+            const delivered = rows.filter(r => deliveredCodes.includes(String(r.statusCode || '').toUpperCase())).length;
+            const inTransit = rows.filter(r => inTransitCodes.includes(String(r.statusCode || '').toUpperCase())).length;
+            const cancelled = rows.filter(r => cancelledCodes.includes(String(r.statusCode || '').toUpperCase())).length;
+            const exceptions = rows.filter(r => {
+                const code = String(r.statusCode || '').toUpperCase();
+                // keep categories mutually exclusive (cancelled should not also be counted as exception)
+                if (cancelledCodes.includes(code)) return false;
+                if (exceptionCodes.includes(code)) return true;
+                if (!deliveredCodes.includes(code) && !inTransitCodes.includes(code) && (r.attemptCount || 0) > 0) return true;
+                return false;
+            }).length;
+            const other = Math.max(0, total - delivered - inTransit - cancelled - exceptions);
+
+            const segments = [
+                { key: 'Delivered', value: delivered, color: '#10b981' },
+                { key: 'In Progress', value: inTransit, color: '#3b82f6' },
+                { key: 'Cancelled', value: cancelled, color: '#f43f5e' },
+                { key: 'Exceptions', value: exceptions, color: '#f59e0b' },
+                { key: 'Other', value: other, color: '#64748b' }
+            ].filter(s => s.value > 0);
+
+            // remove old segments (keep base circles + text)
+            donut.querySelectorAll('[data-seg="1"]').forEach(n => n.remove());
+            let offset = 0;
+            const r = 44;
+            const c = 2 * Math.PI * r;
+            segments.forEach((s) => {
+                const pct = total ? (s.value / total) : 0;
+                const dash = c * pct;
+                const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                el.setAttribute('data-seg', '1');
+                el.setAttribute('cx', '60');
+                el.setAttribute('cy', '60');
+                el.setAttribute('r', String(r));
+                el.setAttribute('fill', 'none');
+                el.setAttribute('stroke', s.color);
+                el.setAttribute('stroke-width', '14');
+                el.setAttribute('stroke-linecap', 'round');
+                el.setAttribute('stroke-dasharray', `${dash} ${c - dash}`);
+                el.setAttribute('stroke-dashoffset', String(-offset));
+                el.setAttribute('transform', 'rotate(-90 60 60)');
+                donut.insertBefore(el, donut.querySelector('circle[cx="60"][r="32"]'));
+                offset += dash;
+            });
+
+            if (donutCenter) donutCenter.textContent = String(total);
+
+            legend.innerHTML = segments.map(s => {
+                const pct = total ? ((s.value / total) * 100).toFixed(1) : '0.0';
+                return `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-block w-2 h-2 rounded-full" style="background:${s.color}"></span>
+                            <span class="font-semibold text-slate-700">${s.key}</span>
+                        </div>
+                        <div class="text-slate-500">${s.value} <span class="text-slate-400">(${pct}%)</span></div>
+                    </div>
+                `;
+            }).join('');
+
+            // ---- 7-day trend ----
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const days = Array.from({ length: 7 }).map((_, i) => {
+                const d = new Date(startOfToday);
+                d.setDate(startOfToday.getDate() - (6 - i));
+                return d;
+            });
+
+            function getRowDate(row) {
+                const raw = row.created_at || row.order_date || row.edd;
+                if (!raw) return null;
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? null : d;
+            }
+
+            const counts = days.map((day) => {
+                const next = new Date(day);
+                next.setDate(day.getDate() + 1);
+                return rows.filter((r) => {
+                    const d = getRowDate(r);
+                    if (!d) return false;
+                    return d >= day && d < next;
+                }).length;
+            });
+
+            const max = Math.max(1, ...counts);
+            trend.innerHTML = counts.map((count) => {
+                const h = Math.round((count / max) * 100);
+                return `
+                    <div class="flex-1 bg-slate-100 rounded-md overflow-hidden">
+                        <div class="w-full bg-slate-900 rounded-md chart-bar" style="--h:${h}%;height:${h}%"></div>
+                    </div>
+                `;
+            }).join('');
+
+            trendLabels.innerHTML = days.map((d) => {
+                const label = d.toLocaleDateString('en-IN', { weekday: 'short' });
+                return `<div class="text-center">${label}</div>`;
+            }).join('');
+
+            // ---- COD vs Prepaid ----
+            const codRows = rows.filter(r => (Number(r.collectable_value) || 0) > 0);
+            const prepaidRows = rows.filter(r => (Number(r.collectable_value) || 0) <= 0);
+            const codPct = total ? (codRows.length / total) * 100 : 0;
+            const prepaidPct = total ? (prepaidRows.length / total) * 100 : 0;
+            codBar.style.width = `${codPct.toFixed(0)}%`;
+            prepaidBar.style.width = `${prepaidPct.toFixed(0)}%`;
+            if (codCountEl) codCountEl.textContent = String(codRows.length);
+            if (prepaidCountEl) prepaidCountEl.textContent = String(prepaidRows.length);
+
+            const todayDelivered = rows.filter(r => deliveredCodes.includes(r.statusCode || ''));
+            const codCollected = todayDelivered.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
+            if (codCollectedInline) codCollectedInline.textContent = formatCurrency(codCollected);
+        }
+
+        function attachHandlers() {
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.addEventListener('input', () => {
+                    if (debounceTimer) {
+                        clearTimeout(debounceTimer);
+                    }
+                    debounceTimer = setTimeout(() => {
+                        fetchShipments(searchInput.value);
+                    }, 300);
+                });
+
+                searchInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        if (debounceTimer) {
+                            clearTimeout(debounceTimer);
+                        }
+                        fetchShipments(searchInput.value);
+                    }
+                });
+            }
+
+            if (clearButton && searchInput) {
+                clearButton.addEventListener('click', () => {
+                    searchInput.value = '';
+                    fetchShipments('');
+                    searchInput.focus();
+                });
+            }
+
+            if (tbody) {
+                tbody.addEventListener('click', (event) => {
+                    const target = /** @type {HTMLElement | null} */ (event.target instanceof HTMLElement ? event.target.closest('[data-awb-link]') : null);
+                    if (target && target.dataset.awbLink) {
+                        openShipmentDetail(target.dataset.awbLink);
+                    }
+                });
+            }
+        }
+
+        /**
+         * @param {string} awb
+         */
+        function openShipmentDetail(awb) {
+            const detailPath = `shipment.html?awb=${encodeURIComponent(awb)}`;
+            window.location.assign(detailPath);
+        }
+
+        const currentDateEl = document.getElementById('currentDate');
+        if (currentDateEl) {
+            currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        // Public mode: load dashboard without authentication.
+        attachHandlers();
+        fetchShipments('');
+    </script>
+</body>
+</html>

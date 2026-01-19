@@ -1,0 +1,11 @@
+{
+  "name": "urbanebolt.dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "create-admin": "node create-admin.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.1"
+  }
+}
