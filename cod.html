@@ -8,9 +8,10 @@
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
 
     <!-- Supabase -->
-    <meta name="supabase-url" content="https://eorcmxacpyphsvjwtmbc.supabase.co">
-    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvcmNteGFjcHlwaHN2and0bWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3OTk5OTMsImV4cCI6MjA4NDM3NTk5M30.l-nvIX7nkuRBhLoT-T6QlYtQNpd1JarFCqX8D-HRXt4">
+    <meta name="supabase-url" content="">
+    <meta name="supabase-anon-key" content="">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/config.js"></script>
     <script src="assets/supabase-runtime.js"></script>
     <script src="assets/data.js"></script>
     <script src="assets/nav.js" defer></script>
@@ -98,6 +99,18 @@
                     <iconify-icon icon="solar:calendar-linear" width="14"></iconify-icon>
                     <span id="currentDate"></span>
                 </div>
+                <div class="hidden md:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Pickup Date</span>
+                    <input id="pickupDateFilter" type="date" class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0">
+                </div>
+                <div class="hidden md:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Shipment Type</span>
+                    <select id="shipmentTypeFilter" class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0 cursor-pointer">
+                        <option value="ALL">All</option>
+                        <option value="PPD">PPD</option>
+                        <option value="COD">COD</option>
+                    </select>
+                </div>
             </div>
 
             <div class="flex items-center gap-2">
@@ -145,7 +158,12 @@
                         <h3 class="text-sm font-bold text-slate-900">Top COD Shipments</h3>
                         <p class="text-xs text-slate-500 mt-0.5">Highest collectable_value (from Supabase)</p>
                     </div>
-                    <span id="codTableStatus" class="text-xs text-slate-500">Loading…</span>
+                    <div class="flex items-center gap-2">
+                        <button id="downloadCodCsv" type="button" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            Download CSV
+                        </button>
+                        <span id="codTableStatus" class="text-xs text-slate-500">Loading…</span>
+                    </div>
                 </div>
                 <div class="overflow-auto">
                     <table class="w-full text-left border-collapse">
@@ -180,61 +198,150 @@
 
             const statusEl = document.getElementById('codTableStatus');
             const tbody = document.getElementById('codTableBody');
+            const pickupDateFilter = document.getElementById('pickupDateFilter');
+            const shipmentTypeFilter = document.getElementById('shipmentTypeFilter');
 
-            const res = data?.fetchShipmentsSafe ? await data.fetchShipmentsSafe({ limit: 500 }) : { rows: [], error: 'Data helper not loaded' };
+            const res = data?.fetchShipmentsSafe
+                ? await data.fetchShipmentsSafe({
+                    limit: 500,
+                    columns: 'awbNumber,customerName,origin,destination,collectable_value,statusDescription,statusCode,created_at,updated_at,order_date,edd,pickup_date,picked_up_at'
+                  })
+                : { rows: [], error: 'Data helper not loaded' };
             if (res.error) {
                 if (statusEl) statusEl.textContent = `Supabase error: ${res.error}`;
                 if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">${escape(res.error)}</td></tr>`;
                 return;
             }
 
-            const rows = res.rows || [];
-            const deliveredCodes = new Set(['DEL']);
-            const codRows = rows.filter(r => (Number(r.collectable_value) || 0) > 0);
-            const delivered = codRows.filter(r => deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
-            const outstanding = codRows.filter(r => !deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
+            const allRows = res.rows || [];
 
-            const deliveredAmt = delivered.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
-            const outstandingAmt = outstanding.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
+            /** @type {{ pickupDateKey: string, shipmentType: 'ALL'|'COD'|'PPD' }} */
+            const filters = { pickupDateKey: '', shipmentType: 'ALL' };
+            const todayKey = data?.dateKey ? data.dateKey(new Date()) : '';
+            filters.pickupDateKey = todayKey;
+            if (pickupDateFilter) pickupDateFilter.value = todayKey;
+            if (shipmentTypeFilter) shipmentTypeFilter.value = 'COD';
+            filters.shipmentType = 'COD';
 
-            const codCountEl = document.getElementById('codCount');
-            const codDeliveredAmtEl = document.getElementById('codDeliveredAmt');
-            const codOutstandingAmtEl = document.getElementById('codOutstandingAmt');
-            const codRefreshEl = document.getElementById('codRefresh');
+            let exportRows = [];
 
-            if (codCountEl) codCountEl.textContent = String(codRows.length);
-            if (codDeliveredAmtEl) codDeliveredAmtEl.textContent = format(deliveredAmt);
-            if (codOutstandingAmtEl) codOutstandingAmtEl.textContent = format(outstandingAmt);
-            if (codRefreshEl) codRefreshEl.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            const render = () => {
+                let rows = allRows;
+                if (data?.filterRowsByPickupDate) rows = data.filterRowsByPickupDate(rows, filters.pickupDateKey);
+                if (data?.filterRowsByShipmentType) rows = data.filterRowsByShipmentType(rows, filters.shipmentType);
 
-            const top = [...codRows]
-                .sort((a, b) => (Number(b.collectable_value) || 0) - (Number(a.collectable_value) || 0))
-                .slice(0, 25);
+                const deliveredCodes = new Set(['DEL']);
+                const codRows = rows.filter(r => (Number(r.collectable_value) || 0) > 0);
+                const delivered = codRows.filter(r => deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
+                const outstanding = codRows.filter(r => !deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
 
-            if (statusEl) statusEl.textContent = `Showing ${top.length} / ${codRows.length}`;
+                const deliveredAmt = delivered.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
+                const outstandingAmt = outstanding.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
 
-            if (!tbody) return;
-            if (top.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">No COD shipments found.</td></tr>`;
-                return;
+                const codCountEl = document.getElementById('codCount');
+                const codDeliveredAmtEl = document.getElementById('codDeliveredAmt');
+                const codOutstandingAmtEl = document.getElementById('codOutstandingAmt');
+                const codRefreshEl = document.getElementById('codRefresh');
+
+                if (codCountEl) codCountEl.textContent = String(codRows.length);
+                if (codDeliveredAmtEl) codDeliveredAmtEl.textContent = format(deliveredAmt);
+                if (codOutstandingAmtEl) codOutstandingAmtEl.textContent = format(outstandingAmt);
+                if (codRefreshEl) codRefreshEl.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+                exportRows = codRows;
+
+                // Enable CSV download (exports the filtered COD rows)
+                const downloadBtn = document.getElementById('downloadCodCsv');
+                if (downloadBtn) {
+                    downloadBtn.disabled = exportRows.length === 0;
+
+                    function csvCell(v) {
+                        const s = String(v ?? '');
+                        const escaped = s.replace(/"/g, '""');
+                        return `"${escaped}"`;
+                    }
+
+                    function toCsv(items) {
+                        const headers = [
+                            'awbNumber',
+                            'customerName',
+                            'origin',
+                            'destination',
+                            'collectable_value',
+                            'statusCode',
+                            'statusDescription'
+                        ];
+                        const lines = [
+                            headers.map(csvCell).join(',')
+                        ];
+                        items.forEach((r) => {
+                            lines.push(headers.map((h) => csvCell(r?.[h])).join(','));
+                        });
+                        return lines.join('\n');
+                    }
+
+                    downloadBtn.onclick = () => {
+                        const csv = toCsv(exportRows);
+                        const now = new Date();
+                        const stamp = now.toISOString().slice(0, 16).replace(/[:T]/g, '-');
+                        const filename = `cod-reconciliation-${filters.pickupDateKey || 'all'}-${stamp}.csv`;
+                        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                    };
+                }
+
+                const top = [...codRows]
+                    .sort((a, b) => (Number(b.collectable_value) || 0) - (Number(a.collectable_value) || 0))
+                    .slice(0, 25);
+
+                if (statusEl) statusEl.textContent = `Showing ${top.length} / ${codRows.length}`;
+
+                if (!tbody) return;
+                if (top.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">No COD shipments found.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = top.map((r) => {
+                    const pill = data?.statusPillHtml ? data.statusPillHtml(r.statusDescription, r.statusCode) : escape(r.statusDescription || r.statusCode || '—');
+                    return `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="py-3 px-6 font-mono text-xs font-semibold text-slate-700">
+                                <a class="text-blue-600 hover:underline" href="shipment.html?awb=${encodeURIComponent(String(r.awbNumber || ''))}">
+                                    ${escape(r.awbNumber || '—')}
+                                </a>
+                            </td>
+                            <td class="py-3 px-6 text-[11px] text-slate-700">${escape(r.customerName || '—')}</td>
+                            <td class="py-3 px-6 text-[11px] text-slate-700">${escape((r.origin || '—') + ' → ' + (r.destination || '—'))}</td>
+                            <td class="py-3 px-6 text-right text-xs font-bold text-slate-900">${format(Number(r.collectable_value) || 0)}</td>
+                            <td class="py-3 px-6">${pill}</td>
+                        </tr>
+                    `;
+                }).join('');
+            };
+
+            render();
+
+            if (pickupDateFilter) {
+                pickupDateFilter.addEventListener('change', () => {
+                    filters.pickupDateKey = pickupDateFilter.value || '';
+                    render();
+                });
             }
-
-            tbody.innerHTML = top.map((r) => {
-                const pill = data?.statusPillHtml ? data.statusPillHtml(r.statusDescription, r.statusCode) : escape(r.statusDescription || r.statusCode || '—');
-                return `
-                    <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-3 px-6 font-mono text-xs font-semibold text-slate-700">
-                            <a class="text-blue-600 hover:underline" href="shipment.html?awb=${encodeURIComponent(String(r.awbNumber || ''))}">
-                                ${escape(r.awbNumber || '—')}
-                            </a>
-                        </td>
-                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape(r.customerName || '—')}</td>
-                        <td class="py-3 px-6 text-[11px] text-slate-700">${escape((r.origin || '—') + ' → ' + (r.destination || '—'))}</td>
-                        <td class="py-3 px-6 text-right text-xs font-bold text-slate-900">${format(Number(r.collectable_value) || 0)}</td>
-                        <td class="py-3 px-6">${pill}</td>
-                    </tr>
-                `;
-            }).join('');
+            if (shipmentTypeFilter) {
+                shipmentTypeFilter.addEventListener('change', () => {
+                    const v = String(shipmentTypeFilter.value || 'ALL').toUpperCase();
+                    filters.shipmentType = (v === 'COD' || v === 'PPD') ? /** @type {'COD'|'PPD'} */ (v) : 'ALL';
+                    render();
+                });
+            }
         })();
     </script>
 </body>

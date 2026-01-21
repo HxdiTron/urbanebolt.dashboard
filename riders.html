@@ -8,9 +8,10 @@
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
 
     <!-- Supabase -->
-    <meta name="supabase-url" content="https://eorcmxacpyphsvjwtmbc.supabase.co">
-    <meta name="supabase-anon-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvcmNteGFjcHlwaHN2and0bWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3OTk5OTMsImV4cCI6MjA4NDM3NTk5M30.l-nvIX7nkuRBhLoT-T6QlYtQNpd1JarFCqX8D-HRXt4">
+    <meta name="supabase-url" content="">
+    <meta name="supabase-anon-key" content="">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/config.js"></script>
     <script src="assets/supabase-runtime.js"></script>
     <script src="assets/data.js"></script>
     <script src="assets/nav.js" defer></script>
@@ -181,7 +182,12 @@
             const tableStatus = document.getElementById('ridersTableStatus');
             const tbody = document.getElementById('ridersTableBody');
 
-            const res = data?.fetchShipmentsSafe ? await data.fetchShipmentsSafe({ limit: 1000 }) : { rows: [], error: 'Data helper not loaded' };
+            const res = data?.fetchShipmentsSafe
+                ? await data.fetchShipmentsSafe({
+                    limit: 1000,
+                    columns: 'riderName,statusDescription,statusCode'
+                  })
+                : { rows: [], error: 'Data helper not loaded' };
             if (res.error) {
                 if (tableStatus) tableStatus.textContent = `Supabase error: ${res.error}`;
                 if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">${escape(res.error)}</td></tr>`;

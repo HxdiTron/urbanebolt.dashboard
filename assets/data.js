@@ -28,6 +28,67 @@
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
+  function dateKey(date) {
+    if (!date) return "";
+    const d = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(d.getTime())) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function getPickupDate(row) {
+    // Prefer explicit pickup fields; fall back to created/order date
+    const raw =
+      row?.pickup_date ||
+      row?.pickupDate ||
+      row?.picked_up_at ||
+      row?.pickup_at ||
+      row?.created_at ||
+      row?.order_date;
+    if (!raw) return null;
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function getLastStatusDate(row) {
+    // Prefer explicit last-status fields; fall back to updated_at, then pickup date
+    const raw =
+      row?.last_status_date ||
+      row?.lastStatusDate ||
+      row?.status_updated_at ||
+      row?.last_status_at ||
+      row?.updated_at ||
+      row?.edd;
+    const d = raw ? new Date(raw) : null;
+    if (d && !Number.isNaN(d.getTime())) return d;
+    return getPickupDate(row);
+  }
+
+  function shipmentType(row) {
+    const cod = (Number(row?.collectable_value) || 0) > 0;
+    return cod ? "COD" : "PPD";
+  }
+
+  function filterRowsByPickupDate(rows, pickupDateKey) {
+    if (!pickupDateKey) return rows;
+    return rows.filter((r) => dateKey(getPickupDate(r)) === pickupDateKey);
+  }
+
+  function filterRowsByShipmentType(rows, type) {
+    if (!type || type === "ALL") return rows;
+    return rows.filter((r) => shipmentType(r) === type);
+  }
+
+  function tatHours(row) {
+    const p = getPickupDate(row);
+    const s = getLastStatusDate(row);
+    if (!p || !s) return null;
+    const diff = (s.getTime() - p.getTime()) / 36e5;
+    return Number.isFinite(diff) ? diff : null;
+  }
+
   function relativeTime(date, now = new Date()) {
     if (!date) return "";
     const diffMs = now.getTime() - date.getTime();
@@ -90,37 +151,100 @@
     `;
   }
 
-  async function fetchShipmentsSafe({ limit = 500 } = {}) {
+  const _cache = new Map();
+  const _inFlight = new Map();
+
+  function _cacheKey({ limit, columns }) {
+    return `shipments|limit=${String(limit)}|cols=${String(columns || "*")}`;
+  }
+
+  function _readCached(key) {
+    const mem = _cache.get(key);
+    if (mem && mem.expiresAt > Date.now()) return mem.value;
+
+    try {
+      const raw = localStorage.getItem(`ubcache:${key}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.expiresAt === "number" && parsed.expiresAt > Date.now()) {
+        _cache.set(key, parsed);
+        return parsed.value;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  function _writeCached(key, value, ttlMs) {
+    const payload = { value, expiresAt: Date.now() + ttlMs };
+    _cache.set(key, payload);
+    try {
+      localStorage.setItem(`ubcache:${key}`, JSON.stringify(payload));
+    } catch {
+      // ignore quota / private mode failures
+    }
+  }
+
+  async function fetchShipmentsSafe({ limit = 500, columns = "*", cacheTtlMs = 30_000, useCache = true } = {}) {
     const client = window.supabaseClient || window.supabase;
     if (!client || typeof client.from !== "function") {
       return { rows: [], error: "Supabase client is not configured." };
     }
 
+    const key = _cacheKey({ limit, columns });
+    if (useCache) {
+      const cached = _readCached(key);
+      if (cached) return cached;
+    }
+
+    if (_inFlight.has(key)) {
+      return await _inFlight.get(key);
+    }
+
     // Try a sane ordering (common schema). If it fails, fall back.
     const tryOrder = async () =>
-      await client.from("shipments").select("*").order("created_at", { ascending: false }).limit(limit);
-    const fallback = async () => await client.from("shipments").select("*").limit(limit);
+      await client.from("shipments").select(columns).order("created_at", { ascending: false }).limit(limit);
+    const fallback = async () => await client.from("shipments").select(columns).limit(limit);
 
-    try {
-      const res = await tryOrder();
-      if (res.error) {
-        const msg = String(res.error.message || "");
-        if (msg.toLowerCase().includes("column") && msg.toLowerCase().includes("created_at")) {
-          const res2 = await fallback();
-          return { rows: res2.data || [], error: res2.error ? res2.error.message : null };
+    const run = (async () => {
+      try {
+        const res = await tryOrder();
+        if (res.error) {
+          const msg = String(res.error.message || "");
+          if (msg.toLowerCase().includes("column") && msg.toLowerCase().includes("created_at")) {
+            const res2 = await fallback();
+            const out2 = { rows: res2.data || [], error: res2.error ? res2.error.message : null };
+            if (!out2.error && useCache) _writeCached(key, out2, cacheTtlMs);
+            return out2;
+          }
+          return { rows: res.data || [], error: res.error.message || "Supabase error" };
         }
-        return { rows: res.data || [], error: res.error.message || "Supabase error" };
+        const out = { rows: res.data || [], error: null };
+        if (useCache) _writeCached(key, out, cacheTtlMs);
+        return out;
+      } catch (e) {
+        return { rows: [], error: String(e?.message || e || "Unknown error") };
+      } finally {
+        _inFlight.delete(key);
       }
-      return { rows: res.data || [], error: null };
-    } catch (e) {
-      return { rows: [], error: String(e?.message || e || "Unknown error") };
-    }
+    })();
+
+    _inFlight.set(key, run);
+    return await run;
   }
 
   window.DashboardData = {
     escapeHtml,
     formatCurrency,
     getRowDate,
+    dateKey,
+    getPickupDate,
+    getLastStatusDate,
+    shipmentType,
+    filterRowsByPickupDate,
+    filterRowsByShipmentType,
+    tatHours,
     relativeTime,
     getStatusCategory,
     statusPillHtml,
