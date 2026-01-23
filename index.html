@@ -154,25 +154,33 @@
                 </div>
             </div>
             
-            <div class="flex items-center gap-3">
-                <div class="relative group">
-                    <iconify-icon icon="solar:magnifer-linear" class="absolute left-3 top-2.5 text-slate-400 group-focus-within:text-slate-600 transition-colors" width="16"></iconify-icon>
+            <div class="flex items-center gap-2">
+                <div class="relative">
+                    <iconify-icon icon="solar:magnifer-linear" class="absolute left-3 top-2.5 text-slate-400" width="16"></iconify-icon>
                     <input
                         data-awb-search
                         type="text"
-                        placeholder="Search by AWB number"
-                        class="w-80 bg-slate-50 border border-slate-200 text-sm rounded-lg pl-9 pr-9 py-2 focus:outline-none focus:ring-2 focus:ring-slate-200 focus:bg-white transition-all placeholder:text-slate-400 text-slate-900"
+                        placeholder="AWB number"
+                        class="w-56 bg-slate-50 border border-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-200 focus:bg-white transition-all placeholder:text-slate-400 text-slate-900"
                         autocomplete="off"
                     >
-                    <button
-                        type="button"
-                        data-clear-search
-                        class="absolute inset-y-1 right-1 px-2 text-[11px] font-semibold text-slate-500 rounded-md hover:bg-slate-100 transition-colors"
-                        aria-label="Clear search"
-                    >
-                        Clear
-                    </button>
                 </div>
+                <button
+                    type="button"
+                    data-search-btn
+                    class="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
+                >
+                    <iconify-icon icon="solar:magnifer-linear" width="16"></iconify-icon>
+                    Search
+                </button>
+                <button
+                    type="button"
+                    data-clear-search
+                    class="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors"
+                    aria-label="Clear filters"
+                >
+                    Clear
+                </button>
             </div>
         </header>
 
@@ -522,8 +530,6 @@
         let requestSequence = 0;
         /** @type {AbortController | null} */
         let activeController = null;
-        /** @type {ReturnType<typeof setTimeout> | null} */
-        let debounceTimer = null;
 
         /** @type {HTMLTableSectionElement | null} */
         const tbody = document.getElementById('shipmentTableBody');
@@ -547,6 +553,8 @@
         const searchInput = document.querySelector('[data-awb-search]');
         /** @type {HTMLButtonElement | null} */
         const clearButton = document.querySelector('[data-clear-search]');
+        /** @type {HTMLButtonElement | null} */
+        const searchButton = document.querySelector('[data-search-btn]');
         /** @type {HTMLInputElement | null} */
         const pickupDateFilter = document.getElementById('pickupDateFilter');
         /** @type {HTMLSelectElement | null} */
@@ -712,7 +720,16 @@
         function renderTable(rows) {
             if (!tbody) return;
             if (!rows.length) {
-                renderEmptyState("No shipment found for this AWB");
+                const term = (searchInput?.value || '').trim();
+                const pickupKey = dashboardFilters.pickupDateKey;
+                const type = dashboardFilters.shipmentType;
+                const filterLabel = `${pickupKey || 'All dates'} / ${type || 'ALL'}`;
+
+                if (term) {
+                    renderEmptyState(`No shipments match "${term}" for ${filterLabel}.`);
+                } else {
+                    renderEmptyState(`No shipments for ${filterLabel}.`);
+                }
                 return;
             }
             setTableStatus(`Showing ${rows.length} shipment${rows.length === 1 ? '' : 's'}`);
@@ -883,10 +900,9 @@
 
             /** @type {Shipment[]} */
             let working = rows;
-            if ((awbTerm || '').trim().length === 0) {
-                if (data?.filterRowsByPickupDate) working = data.filterRowsByPickupDate(working, pickupKey);
-                if (data?.filterRowsByShipmentType) working = data.filterRowsByShipmentType(working, type);
-            }
+            // Always apply filters (search results must respect selected date/type)
+            if (data?.filterRowsByPickupDate) working = data.filterRowsByPickupDate(working, pickupKey);
+            if (data?.filterRowsByShipmentType) working = data.filterRowsByShipmentType(working, type);
 
             renderTable(working);
             computeAndRenderMetrics(working);
@@ -1186,33 +1202,37 @@
                 });
             }
 
-            if (searchInput) {
-                searchInput.focus();
-                searchInput.addEventListener('input', () => {
-                    if (debounceTimer) {
-                        clearTimeout(debounceTimer);
-                    }
-                    debounceTimer = setTimeout(() => {
-                        fetchShipments(searchInput.value);
-                    }, 300);
-                });
+            // Search only triggers on button click or Enter key
+            function triggerSearch() {
+                fetchShipments(searchInput?.value || '');
+            }
 
+            if (searchButton) {
+                searchButton.addEventListener('click', triggerSearch);
+            }
+
+            if (searchInput) {
                 searchInput.addEventListener('keydown', (event) => {
                     if (event.key === 'Enter') {
                         event.preventDefault();
-                        if (debounceTimer) {
-                            clearTimeout(debounceTimer);
-                        }
-                        fetchShipments(searchInput.value);
+                        triggerSearch();
                     }
                 });
             }
 
-            if (clearButton && searchInput) {
+            if (clearButton) {
                 clearButton.addEventListener('click', () => {
-                    searchInput.value = '';
+                    // Reset search input
+                    if (searchInput) searchInput.value = '';
+                    // Reset filters to defaults
+                    const todayKey = window.DashboardData?.dateKey ? window.DashboardData.dateKey(new Date()) : '';
+                    dashboardFilters.pickupDateKey = todayKey;
+                    dashboardFilters.shipmentType = 'ALL';
+                    if (pickupDateFilter) pickupDateFilter.value = todayKey;
+                    if (shipmentTypeFilter) shipmentTypeFilter.value = 'ALL';
+                    // Re-fetch with cleared state
                     fetchShipments('');
-                    searchInput.focus();
+                    if (searchInput) searchInput.focus();
                 });
             }
 
