@@ -2,7 +2,9 @@
   "name": "urbanebolt.dashboard",
   "private": true,
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "build": "node scripts/build-config.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1"
   }
