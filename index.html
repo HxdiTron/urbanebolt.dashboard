@@ -1224,11 +1224,10 @@
                 clearButton.addEventListener('click', () => {
                     // Reset search input
                     if (searchInput) searchInput.value = '';
-                    // Reset filters to defaults
-                    const todayKey = window.DashboardData?.dateKey ? window.DashboardData.dateKey(new Date()) : '';
-                    dashboardFilters.pickupDateKey = todayKey;
+                    // Reset filters to defaults (all dates, all types)
+                    dashboardFilters.pickupDateKey = '';
                     dashboardFilters.shipmentType = 'ALL';
-                    if (pickupDateFilter) pickupDateFilter.value = todayKey;
+                    if (pickupDateFilter) pickupDateFilter.value = '';
                     if (shipmentTypeFilter) shipmentTypeFilter.value = 'ALL';
                     // Re-fetch with cleared state
                     fetchShipments('');
@@ -1259,10 +1258,10 @@
             currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
         }
 
-        // Default performance view: today (pickup date) + ALL shipment types
-        const todayKey = window.DashboardData?.dateKey ? window.DashboardData.dateKey(new Date()) : '';
-        dashboardFilters.pickupDateKey = todayKey;
-        if (pickupDateFilter) pickupDateFilter.value = todayKey;
+        // Default: show ALL shipments (no date filter). User can select a date to filter.
+        dashboardFilters.pickupDateKey = '';
+        dashboardFilters.shipmentType = 'ALL';
+        if (pickupDateFilter) pickupDateFilter.value = '';
         if (shipmentTypeFilter) shipmentTypeFilter.value = 'ALL';
 
         // Public mode: load dashboard without authentication.
