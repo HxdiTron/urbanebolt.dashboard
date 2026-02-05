@@ -3,9 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/build-config.js"
+    "build": "node scripts/build-config.js",
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1"
+  },
+  "devDependencies": {
+    "vercel": "^37.0.0"
   }
 }
