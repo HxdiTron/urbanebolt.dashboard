@@ -1,0 +1,46 @@
+# ============================================================
+# Prometheus Configuration for UrbaneBolt Tracking Backend
+# ============================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files
+rule_files:
+  - 'alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # API Server metrics
+  - job_name: 'tracking-api'
+    static_configs:
+      - targets: ['api:3000']
+    metrics_path: '/metrics'
+
+  # Worker metrics (if exposed)
+  - job_name: 'tracking-workers'
+    static_configs:
+      - targets: ['worker:3000']
+    metrics_path: '/metrics'
+
+  # Redis metrics (requires redis_exporter)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # PostgreSQL metrics (requires postgres_exporter)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

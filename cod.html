@@ -4,40 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UrbaneBolt • COD Reconciliation</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
-
-    <!-- Supabase -->
-    <meta name="supabase-url" content="">
-    <meta name="supabase-anon-key" content="">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="assets/config.js"></script>
-    <script src="assets/supabase-runtime.js"></script>
-    <script src="assets/data.js"></script>
-    <script src="assets/nav.js" defer></script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- API Integration -->
+    <script src="api.js"></script>
+    <script src="config.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
         .premium-shadow { box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03); }
         .premium-border { border: 1px solid #e2e8f0; }
     </style>
 </head>
-<body class="text-slate-600 antialiased h-screen flex overflow-hidden selection:bg-slate-200 selection:text-slate-900">
+<body class="text-slate-600 antialiased h-screen flex overflow-hidden">
 
     <!-- Sidebar -->
     <aside class="w-72 bg-white border-r border-slate-200 flex flex-col justify-between z-20 hidden md:flex shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-slate-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center">
-                        <iconify-icon icon="solar:box-minimalistic-linear" width="20" stroke-width="1.5"></iconify-icon>
-                    </div>
+                    <img src="assets/favicon.ico" alt="UrbaneBolt" class="w-8 h-8 rounded-lg object-contain">
                     <div class="flex flex-col">
                         <span class="font-bold tracking-tight text-slate-900 text-sm leading-none">URBANEBOLT</span>
-                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase"></span>
+                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase">Operations</span>
                     </div>
                 </div>
             </div>
@@ -46,19 +42,19 @@
                 <div class="px-3 pb-2 pt-2">
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Core Data</p>
                 </div>
-
-                <a href="index.html" data-nav-href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:widget-2-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:widget-2-linear" width="18"></iconify-icon>
                     Overview
                 </a>
-
-                <a href="manifest.html" data-nav-href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:clipboard-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:clipboard-list-linear" width="18"></iconify-icon>
                     Master Manifest
                 </a>
 
-                <a href="riders.html" data-nav-href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:user-hand-up-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:user-hand-up-linear" width="18"></iconify-icon>
                     Rider Allocation
                 </a>
 
@@ -66,284 +62,198 @@
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">NDR & Finance</p>
                 </div>
 
-                <a href="cod.html" data-nav-href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:bill-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg bg-slate-900 text-white">
+                    <iconify-icon icon="solar:bill-list-linear" width="18"></iconify-icon>
                     COD Reconciliation
                 </a>
-
-                <a href="exceptions.html" data-nav-href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:danger-triangle-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:danger-triangle-linear" width="18"></iconify-icon>
                     RTO & Exceptions
                 </a>
             </nav>
         </div>
 
         <div class="p-4 border-t border-slate-100">
-            <div class="flex items-center gap-3 w-full p-2 rounded-lg border border-slate-200 bg-slate-50">
-                <img src="https://ui-avatars.com/api/?name=Finance&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
-                <div class="flex flex-col min-w-0">
-                    <span class="text-xs font-semibold text-slate-900 truncate">UrbaneBolt</span>
-                    <span class="text-[10px] text-slate-500 truncate">Public dashboard</span>
+            <div class="flex items-center gap-3 w-full p-2">
+                <img src="https://ui-avatars.com/api/?name=Hub+Manager&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
+                <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-slate-900">Hub Manager</span>
+                    <span class="text-[10px] text-slate-500">UrbaneBolt Dashboard</span>
                 </div>
             </div>
         </div>
     </aside>
 
-    <!-- Main -->
+    <!-- Main Content -->
     <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-50/50">
+        
+        <!-- Header -->
         <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
             <div class="flex items-center gap-4">
                 <h1 class="text-lg font-semibold text-slate-900 tracking-tight">COD Reconciliation</h1>
-                <div class="h-4 w-px bg-slate-200"></div>
-                <div class="flex items-center gap-2 text-xs text-slate-500 bg-slate-100/50 px-2 py-1 rounded-md border border-slate-200">
-                    <iconify-icon icon="solar:calendar-linear" width="14"></iconify-icon>
-                    <span id="currentDate"></span>
-                </div>
-                <div class="hidden md:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Pickup Date</span>
-                    <input id="pickupDateFilter" type="date" class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0">
-                </div>
-                <div class="hidden md:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Shipment Type</span>
-                    <select id="shipmentTypeFilter" class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0 cursor-pointer">
-                        <option value="ALL">All</option>
-                        <option value="PPD">PPD</option>
-                        <option value="COD">COD</option>
-                    </select>
-                </div>
             </div>
-
+            
             <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-slate-500">Public</span>
+                <input type="date" id="dateFilter" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                <button onclick="loadData()" class="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800">
+                    Refresh
+                </button>
+                <button onclick="exportCSV()" class="px-4 py-2 text-sm font-semibold text-slate-900 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">
+                    <iconify-icon icon="solar:download-linear" width="16"></iconify-icon>
+                    Download CSV
+                </button>
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-8 space-y-6">
-            <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <h2 class="text-sm font-bold text-slate-900">COD Reconciliation (Supabase)</h2>
-                        <p class="text-xs text-slate-500 mt-1">Computed from the <span class="font-semibold text-slate-700">shipments</span> table. No mock values.</p>
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto p-8 space-y-8">
+            
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+                            <iconify-icon icon="solar:wallet-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Total COD</span>
                     </div>
-                    <a href="index.html" class="text-xs font-semibold text-blue-600 hover:underline">Back to Dashboard</a>
+                    <h3 id="kpi-total" class="text-2xl font-bold text-slate-900">₹--</h3>
                 </div>
 
-                <div class="mt-5 grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">COD Shipments</p>
-                        <p id="codCount" class="mt-2 text-xl font-bold text-slate-900">—</p>
-                        <p class="mt-1 text-xs text-slate-500">collectable_value &gt; 0</p>
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <iconify-icon icon="solar:check-circle-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Collected</span>
                     </div>
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">COD Delivered</p>
-                        <p id="codDeliveredAmt" class="mt-2 text-xl font-bold text-emerald-700">—</p>
-                        <p class="mt-1 text-xs text-slate-500">Sum of collectable_value for DEL</p>
+                    <h3 id="kpi-collected" class="text-2xl font-bold text-slate-900">₹--</h3>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+                            <iconify-icon icon="solar:clock-circle-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Pending</span>
                     </div>
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">COD Outstanding</p>
-                        <p id="codOutstandingAmt" class="mt-2 text-xl font-bold text-orange-600">—</p>
-                        <p class="mt-1 text-xs text-slate-500">COD not delivered</p>
+                    <h3 id="kpi-pending" class="text-2xl font-bold text-slate-900">₹--</h3>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-rose-50 text-rose-600 rounded-lg">
+                            <iconify-icon icon="solar:close-circle-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Failed</span>
                     </div>
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Last Refresh</p>
-                        <p id="codRefresh" class="mt-2 text-xl font-bold text-slate-900">—</p>
-                        <p class="mt-1 text-xs text-slate-500">From current fetch</p>
-                    </div>
+                    <h3 id="kpi-failed" class="text-2xl font-bold text-slate-900">₹--</h3>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl premium-border premium-shadow flex flex-col overflow-hidden">
-                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-900">Top COD Shipments</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">Highest collectable_value (from Supabase)</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button id="downloadCodCsv" type="button" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Download CSV
-                        </button>
-                        <span id="codTableStatus" class="text-xs text-slate-500">Loading…</span>
-                    </div>
+            <!-- COD Table -->
+            <div class="bg-white rounded-xl premium-border premium-shadow overflow-hidden">
+                <div class="p-6 border-b border-slate-100">
+                    <h2 class="text-base font-bold text-slate-900">COD Shipments</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Cash on delivery transactions</p>
                 </div>
-                <div class="overflow-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">AWB</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Customer</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Route</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">COD</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Status</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">AWB</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Customer</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Amount</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Status</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Rider</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Date</th>
                             </tr>
                         </thead>
-                        <tbody id="codTableBody" class="divide-y divide-slate-100 text-sm">
-                            <tr><td colspan="5" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">Loading…</td></tr>
+                        <tbody id="codTable" class="divide-y divide-slate-100 text-sm">
+                            <tr>
+                                <td colspan="6" class="py-12 text-center text-slate-400">
+                                    <iconify-icon icon="solar:database-linear" width="32" class="mb-2 opacity-50"></iconify-icon>
+                                    <p>Connect your API to load COD data</p>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
+
         </div>
     </main>
 
     <script>
-        const currentDateEl = document.getElementById('currentDate');
-        if (currentDateEl) {
-            currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+        let currentData = [];
+
+        async function loadData() {
+            const date = document.getElementById('dateFilter').value;
+            console.log('Loading COD data for:', date);
+            
+            // TODO: Replace with your API call
+            // const response = await fetch(`https://your-api.com/cod?date=${date}`);
+            // const data = await response.json();
+            // currentData = data.items;
+            // renderCOD(data);
+            
+            alert('Connect your API!\n\nEdit the loadData() function to fetch COD data.');
         }
 
-        (async function loadCod() {
-            const data = window.DashboardData;
-            const format = data?.formatCurrency || ((v) => String(v));
-            const escape = data?.escapeHtml || ((v) => String(v));
-
-            const statusEl = document.getElementById('codTableStatus');
-            const tbody = document.getElementById('codTableBody');
-            const pickupDateFilter = document.getElementById('pickupDateFilter');
-            const shipmentTypeFilter = document.getElementById('shipmentTypeFilter');
-
-            const res = data?.fetchShipmentsSafe
-                ? await data.fetchShipmentsSafe({
-                    limit: 500,
-                    columns: 'awbNumber,customerName,origin,destination,collectable_value,statusDescription,statusCode,created_at,updated_at,order_date,edd,pickup_date,picked_up_at'
-                  })
-                : { rows: [], error: 'Data helper not loaded' };
-            if (res.error) {
-                if (statusEl) statusEl.textContent = `Supabase error: ${res.error}`;
-                if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">${escape(res.error)}</td></tr>`;
+        function renderCOD(data) {
+            document.getElementById('kpi-total').textContent = '₹' + (data.total || 0).toLocaleString('en-IN');
+            document.getElementById('kpi-collected').textContent = '₹' + (data.collected || 0).toLocaleString('en-IN');
+            document.getElementById('kpi-pending').textContent = '₹' + (data.pending || 0).toLocaleString('en-IN');
+            document.getElementById('kpi-failed').textContent = '₹' + (data.failed || 0).toLocaleString('en-IN');
+            
+            const tbody = document.getElementById('codTable');
+            if (!data.items || data.items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">No COD data found</td></tr>';
                 return;
             }
+            
+            tbody.innerHTML = data.items.map(item => `
+                <tr class="hover:bg-slate-50">
+                    <td class="py-3 px-6 font-mono text-xs font-semibold text-blue-600">${item.awb}</td>
+                    <td class="py-3 px-6 text-xs">${item.customer}</td>
+                    <td class="py-3 px-6 text-xs font-semibold">₹${item.amount.toLocaleString('en-IN')}</td>
+                    <td class="py-3 px-6"><span class="px-2 py-1 rounded-full text-[10px] font-semibold ${getStatusClass(item.status)}">${item.status}</span></td>
+                    <td class="py-3 px-6 text-xs">${item.rider || 'N/A'}</td>
+                    <td class="py-3 px-6 text-xs">${item.date}</td>
+                </tr>
+            `).join('');
+        }
 
-            const allRows = res.rows || [];
-
-            /** @type {{ pickupDateKey: string, shipmentType: 'ALL'|'COD'|'PPD' }} */
-            const filters = { pickupDateKey: '', shipmentType: 'ALL' };
-            const todayKey = data?.dateKey ? data.dateKey(new Date()) : '';
-            filters.pickupDateKey = todayKey;
-            if (pickupDateFilter) pickupDateFilter.value = todayKey;
-            if (shipmentTypeFilter) shipmentTypeFilter.value = 'COD';
-            filters.shipmentType = 'COD';
-
-            let exportRows = [];
-
-            const render = () => {
-                let rows = allRows;
-                if (data?.filterRowsByPickupDate) rows = data.filterRowsByPickupDate(rows, filters.pickupDateKey);
-                if (data?.filterRowsByShipmentType) rows = data.filterRowsByShipmentType(rows, filters.shipmentType);
-
-                const deliveredCodes = new Set(['DEL']);
-                const codRows = rows.filter(r => (Number(r.collectable_value) || 0) > 0);
-                const delivered = codRows.filter(r => deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
-                const outstanding = codRows.filter(r => !deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
-
-                const deliveredAmt = delivered.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
-                const outstandingAmt = outstanding.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
-
-                const codCountEl = document.getElementById('codCount');
-                const codDeliveredAmtEl = document.getElementById('codDeliveredAmt');
-                const codOutstandingAmtEl = document.getElementById('codOutstandingAmt');
-                const codRefreshEl = document.getElementById('codRefresh');
-
-                if (codCountEl) codCountEl.textContent = String(codRows.length);
-                if (codDeliveredAmtEl) codDeliveredAmtEl.textContent = format(deliveredAmt);
-                if (codOutstandingAmtEl) codOutstandingAmtEl.textContent = format(outstandingAmt);
-                if (codRefreshEl) codRefreshEl.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-                exportRows = codRows;
-
-                // Enable CSV download (exports the filtered COD rows)
-                const downloadBtn = document.getElementById('downloadCodCsv');
-                if (downloadBtn) {
-                    downloadBtn.disabled = exportRows.length === 0;
-
-                    function csvCell(v) {
-                        const s = String(v ?? '');
-                        const escaped = s.replace(/"/g, '""');
-                        return `"${escaped}"`;
-                    }
-
-                    function toCsv(items) {
-                        const headers = [
-                            'awbNumber',
-                            'customerName',
-                            'origin',
-                            'destination',
-                            'collectable_value',
-                            'statusCode',
-                            'statusDescription'
-                        ];
-                        const lines = [
-                            headers.map(csvCell).join(',')
-                        ];
-                        items.forEach((r) => {
-                            lines.push(headers.map((h) => csvCell(r?.[h])).join(','));
-                        });
-                        return lines.join('\n');
-                    }
-
-                    downloadBtn.onclick = () => {
-                        const csv = toCsv(exportRows);
-                        const now = new Date();
-                        const stamp = now.toISOString().slice(0, 16).replace(/[:T]/g, '-');
-                        const filename = `cod-reconciliation-${filters.pickupDateKey || 'all'}-${stamp}.csv`;
-                        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                        URL.revokeObjectURL(url);
-                    };
-                }
-
-                const top = [...codRows]
-                    .sort((a, b) => (Number(b.collectable_value) || 0) - (Number(a.collectable_value) || 0))
-                    .slice(0, 25);
-
-                if (statusEl) statusEl.textContent = `Showing ${top.length} / ${codRows.length}`;
-
-                if (!tbody) return;
-                if (top.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">No COD shipments found.</td></tr>`;
-                    return;
-                }
-
-                tbody.innerHTML = top.map((r) => {
-                    const pill = data?.statusPillHtml ? data.statusPillHtml(r.statusDescription, r.statusCode) : escape(r.statusDescription || r.statusCode || '—');
-                    return `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="py-3 px-6 font-mono text-xs font-semibold text-slate-700">
-                                <a class="text-blue-600 hover:underline" href="shipment.html?awb=${encodeURIComponent(String(r.awbNumber || ''))}">
-                                    ${escape(r.awbNumber || '—')}
-                                </a>
-                            </td>
-                            <td class="py-3 px-6 text-[11px] text-slate-700">${escape(r.customerName || '—')}</td>
-                            <td class="py-3 px-6 text-[11px] text-slate-700">${escape((r.origin || '—') + ' → ' + (r.destination || '—'))}</td>
-                            <td class="py-3 px-6 text-right text-xs font-bold text-slate-900">${format(Number(r.collectable_value) || 0)}</td>
-                            <td class="py-3 px-6">${pill}</td>
-                        </tr>
-                    `;
-                }).join('');
+        function getStatusClass(status) {
+            const classes = {
+                'Collected': 'bg-emerald-100 text-emerald-700',
+                'Pending': 'bg-amber-100 text-amber-700',
+                'Failed': 'bg-rose-100 text-rose-700'
             };
+            return classes[status] || 'bg-slate-100 text-slate-700';
+        }
 
-            render();
+        function exportCSV() {
+            if (!currentData.length) {
+                alert('No data to export. Load data first.');
+                return;
+            }
+            
+            const headers = ['AWB', 'Customer', 'Amount', 'Status', 'Rider', 'Date'];
+            const rows = currentData.map(r => [r.awb, r.customer, r.amount, r.status, r.rider, r.date]);
+            const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cod-${document.getElementById('dateFilter').value}.csv`;
+            a.click();
+        }
 
-            if (pickupDateFilter) {
-                pickupDateFilter.addEventListener('change', () => {
-                    filters.pickupDateKey = pickupDateFilter.value || '';
-                    render();
-                });
-            }
-            if (shipmentTypeFilter) {
-                shipmentTypeFilter.addEventListener('change', () => {
-                    const v = String(shipmentTypeFilter.value || 'ALL').toUpperCase();
-                    filters.shipmentType = (v === 'COD' || v === 'PPD') ? /** @type {'COD'|'PPD'} */ (v) : 'ALL';
-                    render();
-                });
-            }
-        })();
+        document.getElementById('dateFilter').valueAsDate = new Date();
     </script>
 </body>
 </html>
-

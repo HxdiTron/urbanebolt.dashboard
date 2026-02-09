@@ -1,20 +1,6 @@
 .DS_Store
-.vscode/
-.cursor/
-
-# Node (only needed if you run scripts locally)
+.env*
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Vercel
-.vercel/
-
-# Local env / secrets
-.env
-.env.*
-!.env.example
-assets/config.js
-
-.vercel
+# IMPORTANT: Never commit actual API configuration
+config.js

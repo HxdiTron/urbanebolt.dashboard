@@ -4,40 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UrbaneBolt • Rider Allocation</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
-
-    <!-- Supabase -->
-    <meta name="supabase-url" content="">
-    <meta name="supabase-anon-key" content="">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="assets/config.js"></script>
-    <script src="assets/supabase-runtime.js"></script>
-    <script src="assets/data.js"></script>
-    <script src="assets/nav.js" defer></script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- API Integration -->
+    <script src="api.js"></script>
+    <script src="config.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         .premium-shadow { box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03); }
         .premium-border { border: 1px solid #e2e8f0; }
     </style>
 </head>
-<body class="text-slate-600 antialiased h-screen flex overflow-hidden selection:bg-slate-200 selection:text-slate-900">
+<body class="text-slate-600 antialiased h-screen flex overflow-hidden">
 
     <!-- Sidebar -->
     <aside class="w-72 bg-white border-r border-slate-200 flex flex-col justify-between z-20 hidden md:flex shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-slate-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center">
-                        <iconify-icon icon="solar:box-minimalistic-linear" width="20" stroke-width="1.5"></iconify-icon>
-                    </div>
+                    <img src="assets/favicon.ico" alt="UrbaneBolt" class="w-8 h-8 rounded-lg object-contain">
                     <div class="flex flex-col">
                         <span class="font-bold tracking-tight text-slate-900 text-sm leading-none">URBANEBOLT</span>
-                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase"></span>
+                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase">Operations</span>
                     </div>
                 </div>
             </div>
@@ -46,19 +39,19 @@
                 <div class="px-3 pb-2 pt-2">
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Core Data</p>
                 </div>
-
-                <a href="index.html" data-nav-href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:widget-2-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:widget-2-linear" width="18"></iconify-icon>
                     Overview
                 </a>
-
-                <a href="manifest.html" data-nav-href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:clipboard-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:clipboard-list-linear" width="18"></iconify-icon>
                     Master Manifest
                 </a>
 
-                <a href="riders.html" data-nav-href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:user-hand-up-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg bg-slate-900 text-white">
+                    <iconify-icon icon="solar:user-hand-up-linear" width="18"></iconify-icon>
                     Rider Allocation
                 </a>
 
@@ -66,185 +59,179 @@
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">NDR & Finance</p>
                 </div>
 
-                <a href="cod.html" data-nav-href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:bill-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:bill-list-linear" width="18"></iconify-icon>
                     COD Reconciliation
                 </a>
-
-                <a href="exceptions.html" data-nav-href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:danger-triangle-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:danger-triangle-linear" width="18"></iconify-icon>
                     RTO & Exceptions
                 </a>
             </nav>
         </div>
 
         <div class="p-4 border-t border-slate-100">
-            <div class="flex items-center gap-3 w-full p-2 rounded-lg border border-slate-200 bg-slate-50">
+            <div class="flex items-center gap-3 w-full p-2">
                 <img src="https://ui-avatars.com/api/?name=Hub+Manager&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
-                <div class="flex flex-col min-w-0">
-                    <span class="text-xs font-semibold text-slate-900 truncate">UrbaneBolt</span>
-                    <span class="text-[10px] text-slate-500 truncate">Public dashboard</span>
+                <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-slate-900">Hub Manager</span>
+                    <span class="text-[10px] text-slate-500">UrbaneBolt Dashboard</span>
                 </div>
             </div>
         </div>
     </aside>
 
-    <!-- Main -->
+    <!-- Main Content -->
     <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-50/50">
+        
+        <!-- Header -->
         <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
             <div class="flex items-center gap-4">
                 <h1 class="text-lg font-semibold text-slate-900 tracking-tight">Rider Allocation</h1>
-                <div class="h-4 w-px bg-slate-200"></div>
-                <div class="flex items-center gap-2 text-xs text-slate-500 bg-slate-100/50 px-2 py-1 rounded-md border border-slate-200">
-                    <iconify-icon icon="solar:calendar-linear" width="14"></iconify-icon>
-                    <span id="currentDate"></span>
-                </div>
             </div>
-
+            
             <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-slate-500">Public</span>
+                <input type="date" id="dateFilter" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                <button onclick="loadData()" class="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800">
+                    Refresh
+                </button>
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-8 space-y-6">
-            <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <h2 class="text-sm font-bold text-slate-900">Rider Allocation (Supabase)</h2>
-                        <p class="text-xs text-slate-500 mt-1">Grouped from the <span class="font-semibold text-slate-700">shipments</span> table. No mock values.</p>
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto p-8 space-y-8">
+            
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
+                            <iconify-icon icon="solar:users-group-rounded-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Active Riders</span>
                     </div>
-                    <a href="index.html" class="text-xs font-semibold text-blue-600 hover:underline">Back to Dashboard</a>
+                    <h3 id="kpi-active" class="text-2xl font-bold text-slate-900">--</h3>
                 </div>
 
-                <div class="mt-5 grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Riders Seen</p>
-                        <p id="ridersCount" class="mt-2 text-xl font-bold text-slate-900">—</p>
-                        <p class="mt-1 text-xs text-slate-500">Distinct riderName values</p>
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <iconify-icon icon="solar:box-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Total Assigned</span>
                     </div>
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Unassigned</p>
-                        <p id="unassignedCount" class="mt-2 text-xl font-bold text-orange-600">—</p>
-                        <p class="mt-1 text-xs text-slate-500">riderName missing</p>
+                    <h3 id="kpi-assigned" class="text-2xl font-bold text-slate-900">--</h3>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-violet-50 text-violet-600 rounded-lg">
+                            <iconify-icon icon="solar:chart-outline" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Avg Delivery Rate</span>
                     </div>
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Active In-Progress</p>
-                        <p id="activeInProgress" class="mt-2 text-xl font-bold text-blue-700">—</p>
-                        <p class="mt-1 text-xs text-slate-500">Rows in progress (any rider)</p>
+                    <h3 id="kpi-rate" class="text-2xl font-bold text-slate-900">--%</h3>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+                            <iconify-icon icon="solar:clock-circle-linear" width="22"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-500 uppercase">Avg TAT</span>
                     </div>
-                    <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                        <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Last Refresh</p>
-                        <p id="ridersRefresh" class="mt-2 text-xl font-bold text-slate-900">—</p>
-                        <p class="mt-1 text-xs text-slate-500">From current fetch</p>
-                    </div>
+                    <h3 id="kpi-tat" class="text-2xl font-bold text-slate-900">-- hrs</h3>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl premium-border premium-shadow flex flex-col overflow-hidden">
-                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-900">Rider Summary</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">Counts by status category (from Supabase)</p>
-                    </div>
-                    <span id="ridersTableStatus" class="text-xs text-slate-500">Loading…</span>
+            <!-- Riders Table -->
+            <div class="bg-white rounded-xl premium-border premium-shadow overflow-hidden">
+                <div class="p-6 border-b border-slate-100">
+                    <h2 class="text-base font-bold text-slate-900">Rider Performance</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Daily delivery metrics by rider</p>
                 </div>
-                <div class="overflow-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Rider</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">Total</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">Delivered</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">In Progress</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">Exceptions</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">Cancelled</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Rider</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Phone</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Assigned</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Delivered</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Pending</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Failed</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">Success Rate</th>
+                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase">COD Collected</th>
                             </tr>
                         </thead>
-                        <tbody id="ridersTableBody" class="divide-y divide-slate-100 text-sm">
-                            <tr><td colspan="6" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">Loading…</td></tr>
+                        <tbody id="ridersTable" class="divide-y divide-slate-100 text-sm">
+                            <tr>
+                                <td colspan="8" class="py-12 text-center text-slate-400">
+                                    <iconify-icon icon="solar:database-linear" width="32" class="mb-2 opacity-50"></iconify-icon>
+                                    <p>Connect your API to load rider data</p>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
+
         </div>
     </main>
 
     <script>
-        const currentDateEl = document.getElementById('currentDate');
-        if (currentDateEl) {
-            currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+        async function loadData() {
+            const date = document.getElementById('dateFilter').value;
+            console.log('Loading riders for:', date);
+            
+            // TODO: Replace with your API call
+            // const response = await fetch(`https://your-api.com/riders?date=${date}`);
+            // const data = await response.json();
+            // renderRiders(data);
+            
+            alert('Connect your API!\n\nEdit the loadData() function to fetch rider data.');
         }
 
-        (async function loadRiders() {
-            const data = window.DashboardData;
-            const escape = data?.escapeHtml || ((v) => String(v));
-
-            const tableStatus = document.getElementById('ridersTableStatus');
-            const tbody = document.getElementById('ridersTableBody');
-
-            const res = data?.fetchShipmentsSafe
-                ? await data.fetchShipmentsSafe({
-                    limit: 1000,
-                    columns: 'riderName,statusDescription,statusCode'
-                  })
-                : { rows: [], error: 'Data helper not loaded' };
-            if (res.error) {
-                if (tableStatus) tableStatus.textContent = `Supabase error: ${res.error}`;
-                if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">${escape(res.error)}</td></tr>`;
+        function renderRiders(data) {
+            document.getElementById('kpi-active').textContent = data.activeRiders || 0;
+            document.getElementById('kpi-assigned').textContent = data.totalAssigned || 0;
+            document.getElementById('kpi-rate').textContent = (data.avgDeliveryRate || 0) + '%';
+            document.getElementById('kpi-tat').textContent = (data.avgTat || 0) + ' hrs';
+            
+            const tbody = document.getElementById('ridersTable');
+            if (!data.riders || data.riders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400">No rider data found</td></tr>';
                 return;
             }
-
-            const rows = res.rows || [];
-            const categoryOf = data?.getStatusCategory || (() => 'other');
-
-            const riderKey = (r) => String((r.riderName || '')).trim() || 'Unassigned';
-            const groups = new Map();
-            rows.forEach((r) => {
-                const rider = riderKey(r);
-                if (!groups.has(rider)) groups.set(rider, { rider, total: 0, delivered: 0, inProgress: 0, exception: 0, cancelled: 0 });
-                const g = groups.get(rider);
-                g.total += 1;
-                const cat = categoryOf(r.statusDescription, r.statusCode);
-                if (cat === 'delivered') g.delivered += 1;
-                else if (cat === 'in-progress') g.inProgress += 1;
-                else if (cat === 'exception') g.exception += 1;
-                else if (cat === 'cancelled') g.cancelled += 1;
-            });
-
-            const riders = Array.from(groups.values()).filter(g => g.rider !== 'Unassigned');
-            const unassigned = groups.get('Unassigned')?.total || 0;
-
-            const inProgressTotal = rows.filter(r => categoryOf(r.statusDescription, r.statusCode) === 'in-progress').length;
-
-            document.getElementById('ridersCount').textContent = String(riders.length);
-            document.getElementById('unassignedCount').textContent = String(unassigned);
-            document.getElementById('activeInProgress').textContent = String(inProgressTotal);
-            document.getElementById('ridersRefresh').textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-            const sorted = Array.from(groups.values())
-                .sort((a, b) => b.total - a.total)
-                .slice(0, 50);
-
-            if (tableStatus) tableStatus.textContent = `Showing ${sorted.length} / ${groups.size}`;
-
-            if (!tbody) return;
-            if (sorted.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">No rider data available.</td></tr>`;
-                return;
-            }
-
-            tbody.innerHTML = sorted.map((g) => `
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="py-3 px-6 text-[11px] font-semibold text-slate-900">${escape(g.rider)}</td>
-                    <td class="py-3 px-6 text-right text-xs font-bold text-slate-900">${g.total}</td>
-                    <td class="py-3 px-6 text-right text-xs font-semibold text-emerald-700">${g.delivered}</td>
-                    <td class="py-3 px-6 text-right text-xs font-semibold text-blue-700">${g.inProgress}</td>
-                    <td class="py-3 px-6 text-right text-xs font-semibold text-amber-700">${g.exception}</td>
-                    <td class="py-3 px-6 text-right text-xs font-semibold text-rose-700">${g.cancelled}</td>
+            
+            tbody.innerHTML = data.riders.map(r => `
+                <tr class="hover:bg-slate-50">
+                    <td class="py-3 px-6">
+                        <div class="flex items-center gap-3">
+                            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=f1f5f9&color=475569" class="w-8 h-8 rounded-full">
+                            <span class="text-xs font-semibold text-slate-900">${r.name}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-6 text-xs">${r.phone || 'N/A'}</td>
+                    <td class="py-3 px-6 text-xs font-semibold">${r.assigned}</td>
+                    <td class="py-3 px-6 text-xs text-emerald-600 font-semibold">${r.delivered}</td>
+                    <td class="py-3 px-6 text-xs text-amber-600">${r.pending}</td>
+                    <td class="py-3 px-6 text-xs text-rose-600">${r.failed}</td>
+                    <td class="py-3 px-6"><span class="px-2 py-1 rounded-full text-[10px] font-semibold ${getRateClass(r.successRate)}">${r.successRate}%</span></td>
+                    <td class="py-3 px-6 text-xs font-semibold">₹${(r.codCollected || 0).toLocaleString('en-IN')}</td>
                 </tr>
             `).join('');
-        })();
+        }
+
+        function getRateClass(rate) {
+            if (rate >= 90) return 'bg-emerald-100 text-emerald-700';
+            if (rate >= 75) return 'bg-amber-100 text-amber-700';
+            return 'bg-rose-100 text-rose-700';
+        }
+
+        document.getElementById('dateFilter').valueAsDate = new Date();
     </script>
 </body>
 </html>
-

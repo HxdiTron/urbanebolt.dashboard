@@ -4,39 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UrbaneBolt • Shipment Detail</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
-
-    <!-- Supabase -->
-    <meta name="supabase-url" content="">
-    <meta name="supabase-anon-key" content="">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="assets/config.js"></script>
-    <script src="assets/supabase-runtime.js"></script>
-    <script src="assets/nav.js" defer></script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- API Integration -->
+    <script src="api.js"></script>
+    <script src="config.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         .premium-shadow { box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03); }
         .premium-border { border: 1px solid #e2e8f0; }
     </style>
 </head>
-<body class="text-slate-600 antialiased h-screen flex overflow-hidden selection:bg-slate-200 selection:text-slate-900">
+<body class="text-slate-600 antialiased h-screen flex overflow-hidden">
 
     <!-- Sidebar -->
     <aside class="w-72 bg-white border-r border-slate-200 flex flex-col justify-between z-20 hidden md:flex shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
         <div>
             <div class="h-16 flex items-center px-6 border-b border-slate-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center">
-                        <iconify-icon icon="solar:box-minimalistic-linear" width="20" stroke-width="1.5"></iconify-icon>
-                    </div>
+                    <img src="assets/favicon.ico" alt="UrbaneBolt" class="w-8 h-8 rounded-lg object-contain">
                     <div class="flex flex-col">
                         <span class="font-bold tracking-tight text-slate-900 text-sm leading-none">URBANEBOLT</span>
-                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase"></span>
+                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase">Operations</span>
                     </div>
                 </div>
             </div>
@@ -45,19 +39,19 @@
                 <div class="px-3 pb-2 pt-2">
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Core Data</p>
                 </div>
-
-                <a href="index.html" data-nav-href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:widget-2-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:widget-2-linear" width="18"></iconify-icon>
                     Overview
                 </a>
-
-                <a href="manifest.html" data-nav-href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:clipboard-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:clipboard-list-linear" width="18"></iconify-icon>
                     Master Manifest
                 </a>
 
-                <a href="riders.html" data-nav-href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:user-hand-up-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:user-hand-up-linear" width="18"></iconify-icon>
                     Rider Allocation
                 </a>
 
@@ -65,255 +59,349 @@
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">NDR & Finance</p>
                 </div>
 
-                <a href="cod.html" data-nav-href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:bill-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:bill-list-linear" width="18"></iconify-icon>
                     COD Reconciliation
                 </a>
-
-                <a href="exceptions.html" data-nav-href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:danger-triangle-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                
+                <a href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
+                    <iconify-icon icon="solar:danger-triangle-linear" width="18"></iconify-icon>
                     RTO & Exceptions
                 </a>
             </nav>
         </div>
 
         <div class="p-4 border-t border-slate-100">
-            <div class="flex items-center gap-3 w-full p-2 rounded-lg border border-slate-200 bg-slate-50">
-                <img src="https://ui-avatars.com/api/?name=Ops&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
-                <div class="flex flex-col min-w-0">
-                    <span class="text-xs font-semibold text-slate-900 truncate">UrbaneBolt</span>
-                    <span class="text-[10px] text-slate-500 truncate">Public dashboard</span>
+            <div class="flex items-center gap-3 w-full p-2">
+                <img src="https://ui-avatars.com/api/?name=Hub+Manager&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
+                <div class="flex flex-col">
+                    <span class="text-xs font-semibold text-slate-900">Hub Manager</span>
+                    <span class="text-[10px] text-slate-500">UrbaneBolt Dashboard</span>
                 </div>
             </div>
         </div>
     </aside>
 
-    <!-- Main -->
+    <!-- Main Content -->
     <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-50/50">
+        
+        <!-- Header -->
         <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
             <div class="flex items-center gap-4">
+                <a href="index.html" class="text-slate-400 hover:text-slate-900">
+                    <iconify-icon icon="solar:arrow-left-linear" width="20"></iconify-icon>
+                </a>
                 <h1 class="text-lg font-semibold text-slate-900 tracking-tight">Shipment Detail</h1>
-                <div class="h-4 w-px bg-slate-200"></div>
-                <div class="flex items-center gap-2 text-xs text-slate-500 bg-slate-100/50 px-2 py-1 rounded-md border border-slate-200">
-                    <iconify-icon icon="solar:calendar-linear" width="14"></iconify-icon>
-                    <span id="currentDate"></span>
+                <div id="loadingIndicator" class="hidden">
+                    <iconify-icon icon="solar:refresh-linear" width="18" class="animate-spin text-slate-400"></iconify-icon>
                 </div>
             </div>
-
+            
             <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold text-slate-500">Public</span>
+                <input type="text" id="awbInput" placeholder="Enter AWB..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 w-48 font-mono">
+                <button onclick="loadShipment()" class="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800">
+                    Track
+                </button>
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-8 space-y-6">
-            <div class="flex items-center justify-between">
-                <a href="index.html" class="inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:underline">
-                    <iconify-icon icon="solar:alt-arrow-left-linear"></iconify-icon>
-                    Back to Dashboard
-                </a>
-                <span id="awbBadge" class="text-xs font-semibold text-slate-500"></span>
-            </div>
-
-            <div id="stateCard" class="bg-white rounded-xl p-6 premium-border premium-shadow">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <h2 class="text-sm font-bold text-slate-900">Loading…</h2>
-                        <p class="text-xs text-slate-500 mt-1">Fetching shipment record.</p>
-                    </div>
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Live</span>
-                </div>
-            </div>
-
-            <div id="detailGrid" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-white rounded-xl p-6 premium-border premium-shadow">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">Shipment Summary</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">Key fields from the shipments table</p>
-                        </div>
-                        <div id="statusPill"></div>
-                    </div>
-
-                    <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Customer</p>
-                            <p id="customer" class="mt-2 font-semibold text-slate-900">—</p>
-                            <p id="order" class="mt-1 text-xs text-slate-500">—</p>
-                        </div>
-                        <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Route</p>
-                            <p id="route" class="mt-2 font-semibold text-slate-900">—</p>
-                            <p id="pins" class="mt-1 text-xs text-slate-500">—</p>
-                        </div>
-                        <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Service</p>
-                            <p id="service" class="mt-2 font-semibold text-slate-900">—</p>
-                            <p id="product" class="mt-1 text-xs text-slate-500">—</p>
-                        </div>
-                        <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Value</p>
-                            <p id="codValue" class="mt-2 font-semibold text-slate-900">—</p>
-                            <p id="declaredValue" class="mt-1 text-xs text-slate-500">—</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow">
-                    <h3 class="text-sm font-bold text-slate-900">Operations</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Delivery attempt and assignment signals</p>
-
-                    <div class="mt-5 space-y-3">
-                        <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Rider</p>
-                            <p id="rider" class="mt-2 font-semibold text-slate-900">—</p>
-                        </div>
-                        <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">EDD</p>
-                            <p id="edd" class="mt-2 font-semibold text-slate-900">—</p>
-                        </div>
-                        <div class="p-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Attempts</p>
-                            <p id="attempts" class="mt-2 font-semibold text-slate-900">—</p>
-                        </div>
-                    </div>
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto p-8 space-y-8">
+            <div id="shipmentContent">
+                <div class="bg-white rounded-xl premium-border premium-shadow p-12 text-center">
+                    <iconify-icon icon="solar:box-linear" width="48" class="text-slate-300 mb-4"></iconify-icon>
+                    <p class="text-slate-500">Enter an AWB number to view shipment details</p>
                 </div>
             </div>
         </div>
     </main>
 
     <script>
-        function escapeHtml(value) {
-            return String(value ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+        // Check for AWB in URL
+        const params = new URLSearchParams(window.location.search);
+        const awbFromUrl = params.get('awb');
+        if (awbFromUrl) {
+            document.getElementById('awbInput').value = awbFromUrl;
+            // Wait for API to be configured
+            setTimeout(loadShipment, 100);
         }
 
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
         }
 
-        function getStatusCategory(status, code) {
-            const c = String(code || '').trim().toUpperCase();
-            const s = String(status || '').trim().toLowerCase();
-            const deliveredCodes = new Set(['DEL', 'DLV', 'DELIVERED']);
-            const inProgressCodes = new Set(['INT', 'OFD', 'OFD1', 'OFD2', 'IT', 'INTRANSIT']);
-            const cancelledCodes = new Set(['CNL', 'CAN', 'CX', 'CANC', 'CNCL', 'CANCELED', 'CANCELLED']);
-            const exceptionCodes = new Set(['UD', 'RTO', 'NDR', 'FAILED', 'FAIL']);
+        async function loadShipment() {
+            const awb = document.getElementById('awbInput').value.trim();
+            if (!awb) {
+                alert('Please enter an AWB number');
+                return;
+            }
 
-            if (deliveredCodes.has(c) || s.includes('delivered')) return 'delivered';
-            if (cancelledCodes.has(c) || s.includes('cancel')) return 'cancelled';
-            if (exceptionCodes.has(c) || s.includes('undeliver') || s.includes('failed') || s.includes('rto') || s.includes('ndr')) return 'exception';
-            if (inProgressCodes.has(c) || s.includes('in progress') || s.includes('in-transit') || s.includes('in transit') || s.includes('out for delivery') || s.includes('transit')) return 'in-progress';
-            return 'other';
-        }
-
-        function statusPillHtml(status, code) {
-            const category = getStatusCategory(status, code);
-            const theme = {
-                delivered: { pill: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60', dot: 'bg-emerald-500' },
-                'in-progress': { pill: 'bg-blue-50 text-blue-700 border border-blue-200/60', dot: 'bg-blue-500' },
-                cancelled: { pill: 'bg-rose-50 text-rose-700 border border-rose-200/60', dot: 'bg-rose-500' },
-                exception: { pill: 'bg-amber-50 text-amber-800 border border-amber-200/60', dot: 'bg-amber-500' },
-                other: { pill: 'bg-slate-100 text-slate-700 border border-slate-200', dot: 'bg-slate-400' }
-            }[category];
-
-            const safeStatus = escapeHtml(status || 'Unknown');
-            const safeCode = escapeHtml((code || '').toString());
-            return `
-                <span class="inline-flex items-center gap-2 px-2 py-1 rounded-md text-xs font-semibold ${theme.pill}" title="${safeCode}">
-                    <span class="w-1.5 h-1.5 rounded-full ${theme.dot}"></span>
-                    ${safeStatus}
-                </span>
-            `;
-        }
-
-        const currentDateEl = document.getElementById('currentDate');
-        if (currentDateEl) {
-            currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-        }
-
-        const u = new URL(window.location.href);
-        const awb = (u.searchParams.get('awb') || '').trim();
-        const awbBadge = document.getElementById('awbBadge');
-        if (awbBadge) awbBadge.textContent = awb ? `AWB: ${awb}` : '';
-
-        function setStateCard(title, subtitle, tone) {
-            const card = document.getElementById('stateCard');
-            if (!card) return;
-            const styles = {
-                info: 'border-slate-200 bg-white',
-                warn: 'border-amber-200 bg-amber-50/40',
-                error: 'border-rose-200 bg-rose-50/40',
-            }[tone || 'info'];
-            card.className = `bg-white rounded-xl p-6 premium-border premium-shadow ${styles}`;
-            card.innerHTML = `
-                <div class="flex items-start justify-between">
-                    <div>
-                        <h2 class="text-sm font-bold text-slate-900">${escapeHtml(title)}</h2>
-                        <p class="text-xs text-slate-500 mt-1">${escapeHtml(subtitle)}</p>
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+            
+            try {
+                const data = await API.tracking.getByAwb(awb);
+                
+                if (data) {
+                    renderShipment(data);
+                    // Update URL without reload
+                    history.replaceState(null, '', `?awb=${encodeURIComponent(awb)}`);
+                } else {
+                    document.getElementById('shipmentContent').innerHTML = `
+                        <div class="bg-white rounded-xl premium-border premium-shadow p-12 text-center">
+                            <iconify-icon icon="solar:close-circle-linear" width="48" class="text-rose-300 mb-4"></iconify-icon>
+                            <p class="text-slate-500">No shipment found for AWB: <span class="font-mono font-semibold">${escapeHtml(awb)}</span></p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('[Shipment] Error:', error);
+                document.getElementById('shipmentContent').innerHTML = `
+                    <div class="bg-white rounded-xl premium-border premium-shadow p-12 text-center">
+                        <iconify-icon icon="solar:danger-triangle-linear" width="48" class="text-rose-300 mb-4"></iconify-icon>
+                        <p class="text-rose-600 font-semibold">Error loading shipment</p>
+                        <p class="text-slate-500 text-sm mt-2">${escapeHtml(error.message)}</p>
                     </div>
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Live</span>
+                `;
+            } finally {
+                document.getElementById('loadingIndicator').classList.add('hidden');
+            }
+        }
+
+        /**
+         * Render shipment details from API response
+         * API Fields: awbNumber, orderNumber, shipperName, origin, destination, 
+         * currentLocation, currentStatusDateTime, currentStatusCode, currentStatusCodeDescription,
+         * productType, weight, pieces, addedOn, edd, isRto, rto_status, delPod, scans[]
+         */
+        function renderShipment(data) {
+            const shipment = {
+                awb: String(data.awbNumber || ''),
+                orderNumber: data.orderNumber || '',
+                status: data.currentStatusCodeDescription || data.currentStatusCode || 'Unknown',
+                statusCode: data.currentStatusCode || '',
+                customer: data.shipperName || 'N/A',
+                origin: data.origin || 'N/A',
+                destination: data.destination || 'N/A',
+                currentLocation: data.currentLocation || data.destination || '',
+                type: data.productType || 'PPD',
+                weight: data.weight || 0,
+                pieces: data.pieces || 1,
+                addedOn: data.addedOn || 'N/A',
+                edd: data.edd || 'N/A',
+                lastUpdate: data.currentStatusDateTime || 'N/A',
+                isRto: data.isRto || false,
+                rtoStatus: data.rto_status || 0,
+                delPod: data.delPod || '',
+                reasonCode: data.currentReasonCode || '',
+                reasonDescription: data.currentReasonCodeDescription || '',
+                scans: data.scans || [],
+            };
+            
+            // Find delivery date from scans if delivered
+            let deliveryDate = '';
+            if (shipment.statusCode === 'DDL' && shipment.scans.length > 0) {
+                const deliveryScan = shipment.scans.find(s => s.statusCode === 'DDL');
+                if (deliveryScan) deliveryDate = deliveryScan.statusDateTime;
+            }
+
+            const content = document.getElementById('shipmentContent');
+            
+            content.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    <!-- Main Info -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                            <div class="flex justify-between items-start mb-6">
+                                <div>
+                                    <p class="text-[10px] font-semibold text-slate-400 uppercase">AWB Number</p>
+                                    <h2 class="text-xl font-bold text-slate-900 font-mono">${escapeHtml(shipment.awb)}</h2>
+                                    ${shipment.orderNumber ? `<p class="text-xs text-slate-500 mt-1">Order: #${escapeHtml(shipment.orderNumber)}</p>` : ''}
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusClass(shipment.statusCode)}">${escapeHtml(shipment.status)}</span>
+                                    ${shipment.isRto ? '<span class="px-2 py-1 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-700">RTO</span>' : ''}
+                                </div>
+                            </div>
+                            
+                            ${shipment.reasonDescription ? `
+                            <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <p class="text-[10px] font-semibold text-amber-600 uppercase mb-1">Current Status Reason</p>
+                                <p class="text-sm text-amber-800">${escapeHtml(shipment.reasonDescription)}</p>
+                                ${shipment.reasonCode ? `<p class="text-[10px] text-amber-600 mt-1">Code: ${escapeHtml(shipment.reasonCode)}</p>` : ''}
+                            </div>
+                            ` : ''}
+                            
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                <div>
+                                    <p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Shipper</p>
+                                    <p class="text-sm font-medium text-slate-900">${escapeHtml(shipment.customer)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Current Location</p>
+                                    <p class="text-sm font-medium text-slate-900">${escapeHtml(shipment.currentLocation) || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Payment Type</p>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${shipment.type === 'COD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${escapeHtml(shipment.type)}</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Origin</p>
+                                    <p class="text-sm font-medium text-slate-900">${escapeHtml(shipment.origin)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Destination</p>
+                                    <p class="text-sm font-medium text-slate-900">${escapeHtml(shipment.destination)}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Weight / Pieces</p>
+                                    <p class="text-sm font-medium text-slate-900">${shipment.weight} kg / ${shipment.pieces} pc</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Timeline -->
+                        <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                            <h3 class="text-sm font-bold text-slate-900 mb-4">Tracking History (${shipment.scans.length} events)</h3>
+                            <div id="timeline" class="space-y-4 max-h-96 overflow-y-auto">
+                                ${renderTimeline(shipment.scans)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sidebar -->
+                    <div class="space-y-6">
+                        <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                            <h3 class="text-sm font-bold text-slate-900 mb-4">Key Dates</h3>
+                            <div class="space-y-3 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Added On</span>
+                                    <span class="font-semibold text-slate-900">${escapeHtml(shipment.addedOn)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">EDD</span>
+                                    <span class="font-semibold text-slate-900">${escapeHtml(shipment.edd)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Last Update</span>
+                                    <span class="font-semibold text-slate-900">${escapeHtml(shipment.lastUpdate)}</span>
+                                </div>
+                                ${deliveryDate ? `
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500">Delivered On</span>
+                                    <span class="font-semibold text-emerald-600">${escapeHtml(deliveryDate)}</span>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        ${shipment.delPod ? `
+                        <div class="bg-white rounded-xl premium-border premium-shadow p-6">
+                            <h3 class="text-sm font-bold text-slate-900 mb-4">Proof of Delivery</h3>
+                            <a href="${escapeHtml(shipment.delPod)}" target="_blank" class="block">
+                                <img src="${escapeHtml(shipment.delPod)}" alt="Delivery POD" class="w-full rounded-lg border border-slate-200 hover:border-blue-400 transition-colors">
+                            </a>
+                            <a href="${escapeHtml(shipment.delPod)}" target="_blank" class="mt-3 flex items-center justify-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                <iconify-icon icon="solar:gallery-wide-linear" width="14"></iconify-icon>
+                                View Full Image
+                            </a>
+                        </div>
+                        ` : ''}
+                        
+                        <button onclick="loadShipment()" class="w-full px-4 py-3 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 flex items-center justify-center gap-2">
+                            <iconify-icon icon="solar:refresh-linear" width="16"></iconify-icon>
+                            Refresh Tracking
+                        </button>
+                    </div>
                 </div>
             `;
         }
 
-        // Public mode: no auth required.
-        (async function loadShipment() {
-            if (!awb) {
-                setStateCard('Missing AWB', 'Open this page from the dashboard by clicking an AWB, or pass ?awb=XXXX', 'warn');
-                return;
+        /**
+         * Render timeline from scans array
+         * Scan fields: statusDateTime, statusCode, statusCodeDescription, reasonCode, reasonCodeDescription, currentLocation
+         */
+        function renderTimeline(scans) {
+            if (!scans || scans.length === 0) {
+                return '<p class="text-sm text-slate-400">No tracking history available</p>';
             }
 
-            const client = window.__getSupabaseClient?.();
-            if (!client) {
-                setStateCard('Supabase not configured', 'Missing Supabase URL or anon key.', 'error');
-                return;
-            }
+            return scans.map((scan, i) => {
+                const statusIcon = getStatusIcon(scan.statusCode);
+                const statusColor = getTimelineColor(scan.statusCode);
+                
+                return `
+                    <div class="flex gap-4">
+                        <div class="flex flex-col items-center">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center ${statusColor}">
+                                <iconify-icon icon="${statusIcon}" width="14"></iconify-icon>
+                            </div>
+                            ${i < (scans.length - 1) ? '<div class="w-0.5 flex-1 bg-slate-200 min-h-[20px]"></div>' : ''}
+                        </div>
+                        <div class="pb-4 flex-1">
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold text-slate-900">${escapeHtml(scan.statusCodeDescription || scan.statusCode || 'Update')}</p>
+                                <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(scan.statusCode)}</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500">${escapeHtml(scan.currentLocation || '')}</p>
+                            <p class="text-[10px] text-slate-400">${escapeHtml(scan.statusDateTime || '')}</p>
+                            ${scan.reasonCodeDescription ? `<p class="text-[10px] text-amber-600 mt-1">${escapeHtml(scan.reasonCodeDescription)}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
 
-            setStateCard('Loading…', 'Fetching shipment record.', 'info');
-
-            const { data, error } = await client.from('shipments').select('*').eq('awbNumber', awb).limit(1).maybeSingle();
-            if (error) {
-                console.error(error);
-                setStateCard('Unable to load shipment', error.message || 'Supabase error', 'error');
-                return;
-            }
-            if (!data) {
-                setStateCard('Shipment not found', `No record found for AWB ${awb}`, 'warn');
-                return;
-            }
-
-            // Populate UI
-            document.title = `UrbaneBolt • ${awb}`;
-            const detailGrid = document.getElementById('detailGrid');
-            if (detailGrid) detailGrid.classList.remove('hidden');
-
-            const statusEl = document.getElementById('statusPill');
-            if (statusEl) statusEl.innerHTML = statusPillHtml(data.statusDescription, data.statusCode);
-
-            const setText = (id, value) => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = value;
+        function getStatusIcon(code) {
+            const icons = {
+                'DDL': 'solar:check-circle-bold',
+                'OFD': 'solar:delivery-linear',
+                'DDS': 'solar:calendar-linear',
+                'UDD': 'solar:close-circle-linear',
+                'PKD': 'solar:box-linear',
+                'MAN': 'solar:clipboard-list-linear',
+                'IND': 'solar:inbox-in-linear',
+                'BGD': 'solar:bag-check-linear',
+                'DPD': 'solar:routing-linear',
+                'ARD': 'solar:map-arrow-down-linear',
+                'RDC': 'solar:buildings-linear',
+                'DBG': 'solar:inbox-out-linear',
+                'RTO': 'solar:return-up-back-linear',
             };
+            return icons[code] || 'solar:point-on-map-linear';
+        }
 
-            setText('customer', data.customerName || '—');
-            setText('order', data.order_number ? `Ord: ${data.order_number}` : '—');
-            setText('route', `${data.origin || '—'} → ${data.destination || '—'}`);
-            setText('pins', `${data.originPincode || '—'} → ${data.destinationPincode || '—'}`);
-            setText('service', data.serviceType || '—');
-            setText('product', data.product_type || '—');
-            setText('codValue', formatCurrency(Number(data.collectable_value) || 0));
-            setText('declaredValue', `Declared: ${formatCurrency(Number(data.declared_value) || 0)}`);
-            setText('rider', data.riderName || 'Unassigned');
-            setText('edd', data.edd || '—');
-            setText('attempts', typeof data.attemptCount === 'number' ? String(data.attemptCount) : '—');
+        function getTimelineColor(code) {
+            if (code === 'DDL') return 'bg-emerald-100 text-emerald-600';
+            if (code === 'OFD' || code === 'DDS') return 'bg-amber-100 text-amber-600';
+            if (code === 'UDD') return 'bg-rose-100 text-rose-600';
+            if (code === 'RTO') return 'bg-red-100 text-red-600';
+            return 'bg-blue-100 text-blue-600';
+        }
 
-            setStateCard('Loaded', 'Shipment record loaded successfully.', 'info');
-        })();
+        function getStatusClass(statusCode) {
+            const code = (statusCode || '').toUpperCase();
+            if (code === 'DDL') return 'bg-emerald-100 text-emerald-700';
+            if (['MAN', 'PKD', 'IND', 'BGD', 'DPD', 'ARD', 'RDC', 'DBG'].includes(code)) return 'bg-blue-100 text-blue-700';
+            if (code === 'OFD' || code === 'DDS') return 'bg-amber-100 text-amber-700';
+            if (code === 'RTO') return 'bg-rose-100 text-rose-700';
+            if (code === 'UDD' || code === 'NDR') return 'bg-orange-100 text-orange-700';
+            if (code === 'CAN') return 'bg-slate-100 text-slate-700';
+            return 'bg-slate-100 text-slate-700';
+        }
+
+        // Enter key to track
+        document.getElementById('awbInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') loadShipment();
+        });
+
+        // Add CSS for animations
+        const style = document.createElement('style');
+        style.textContent = '.animate-spin { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
-

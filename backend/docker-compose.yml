@@ -1,0 +1,178 @@
+# ============================================================
+# UrbaneBolt Tracking Backend - Docker Compose
+# ============================================================
+# 
+# Usage:
+#   Development:  docker-compose up -d
+#   Production:   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Scale workers: docker-compose up -d --scale worker=3
+#
+# ============================================================
+
+version: '3.8'
+
+services:
+  # ============================================================
+  # PostgreSQL Database
+  # ============================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: urbanebolt-postgres
+    environment:
+      POSTGRES_DB: urbanebolt
+      POSTGRES_USER: urbanebolt
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-localdev123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U urbanebolt"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================
+  # Redis (Queue + Cache + Rate Limiting)
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: urbanebolt-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================
+  # API Service
+  # ============================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: urbanebolt-api
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgres://urbanebolt:${DB_PASSWORD:-localdev123}@postgres:5432/urbanebolt
+      REDIS_URL: redis://redis:6379
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_BASE_URL: https://api.urbanebolt.in
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================
+  # Sync Workers (Horizontally Scalable)
+  # ============================================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgres://urbanebolt:${DB_PASSWORD:-localdev123}@postgres:5432/urbanebolt
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_BASE_URL: https://api.urbanebolt.in
+      MAX_CONCURRENT_REQUESTS: 20
+      REQUESTS_PER_MINUTE: 60
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 3
+    restart: unless-stopped
+
+  # ============================================================
+  # Scheduler
+  # ============================================================
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: scheduler
+    container_name: urbanebolt-scheduler
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgres://urbanebolt:${DB_PASSWORD:-localdev123}@postgres:5432/urbanebolt
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================
+  # Prometheus (Metrics Collection)
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: urbanebolt-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # ============================================================
+  # Grafana (Dashboards & Visualization)
+  # ============================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: urbanebolt-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+# ============================================================
+# Volumes
+# ============================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ============================================================
+# Networks
+# ============================================================
+networks:
+  default:
+    name: urbanebolt-network

@@ -1,0 +1,120 @@
+# ============================================================
+# Prometheus Alert Rules for UrbaneBolt Tracking Backend
+# ============================================================
+
+groups:
+  - name: tracking-alerts
+    rules:
+      # High sync failure rate
+      - alert: HighSyncFailureRate
+        expr: rate(tracking_sync_total{status="failed"}[5m]) / rate(tracking_sync_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High sync failure rate ({{ $value | humanizePercentage }})"
+          description: "More than 10% of syncs are failing in the last 5 minutes"
+
+      # Circuit breaker is open
+      - alert: CircuitBreakerOpen
+        expr: tracking_circuit_breaker_open == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker is OPEN"
+          description: "The circuit breaker has opened due to repeated API failures"
+
+      # Rate limit near max
+      - alert: RateLimitNearMax
+        expr: tracking_rate_limit_usage > 50
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Approaching rate limit ({{ $value }}/60 req/min)"
+          description: "API rate limit usage is above 80%"
+
+      # Large queue backlog
+      - alert: SyncQueueBacklog
+        expr: bullmq_queue_waiting{queue="tracking-sync"} > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large sync queue backlog ({{ $value }} jobs)"
+          description: "More than 1000 jobs waiting in the sync queue"
+
+      # High API latency
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(tracking_api_latency_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency (p95: {{ $value | humanizeDuration }})"
+          description: "95th percentile API latency is above 5 seconds"
+
+      # No syncs happening
+      - alert: NoSyncsOccurring
+        expr: rate(tracking_sync_total[30m]) == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No syncs occurring"
+          description: "No sync activity detected in the last 30 minutes"
+
+      # Database connection issues
+      - alert: DatabaseConnectionIssues
+        expr: db_connections_active < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection issues"
+          description: "No active database connections detected"
+
+  - name: api-alerts
+    rules:
+      # High error rate
+      - alert: HighHTTPErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate ({{ $value | humanizePercentage }})"
+          description: "More than 5% of HTTP requests are returning 5xx errors"
+
+      # Slow HTTP responses
+      - alert: SlowHTTPResponses
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow HTTP responses (p95: {{ $value | humanizeDuration }})"
+          description: "95th percentile HTTP response time is above 2 seconds"
+
+  - name: infrastructure-alerts
+    rules:
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 > 512
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage ({{ $value | humanize }}MB)"
+          description: "Process memory usage is above 512MB"
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is consistently high"

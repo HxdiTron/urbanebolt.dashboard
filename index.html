@@ -3,1270 +3,1300 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UrbaneBolt • Dashboard</title>
+    <title>UrbaneBolt • Operations Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
-    <!-- Supabase (required for live data fetching) -->
-    <meta name="supabase-url" content="">
-    <meta name="supabase-anon-key" content="">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="assets/config.js"></script>
-    <script src="assets/supabase-runtime.js"></script>
-    <script src="assets/data.js"></script>
-    <script src="assets/nav.js" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="api.js"></script>
+    <script src="config.js"></script>
     <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: #f8fafc; /* Slate 50 */
-        }
-        
-        /* Custom scrollbar */
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-        
-        .premium-shadow {
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03);
-        }
-
-        .premium-border {
-            border: 1px solid #e2e8f0;
-        }
-
-        /* Chart animations */
-        @keyframes grow-bar { from { height: 0; } to { height: var(--h); } }
-        .chart-bar { animation: grow-bar 1s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-
-        /* Status storytelling (fast visual scan in table) */
-        tr.status-row td:first-child { position: relative; }
-        tr.status-row td:first-child::before {
-            content: "";
-            position: absolute;
-            left: 12px;            /* sits inside the existing px-6 padding */
-            top: 10px;
-            bottom: 10px;
-            width: 3px;
-            border-radius: 999px;
-            background: #cbd5e1;   /* slate-300 */
-        }
-        tr.status--delivered td:first-child::before { background: #10b981; } /* emerald-500 */
-        tr.status--in-progress td:first-child::before { background: #3b82f6; } /* blue-500 */
-        tr.status--cancelled td:first-child::before { background: #f43f5e; } /* rose-500 */
-        tr.status--exception td:first-child::before { background: #f59e0b; } /* amber-500 */
-        tr.status--other td:first-child::before { background: #94a3b8; } /* slate-400 */
+        .premium-shadow { box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03); }
+        .premium-border { border: 1px solid #e2e8f0; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .status-delivered { background-color: #d1fae5; color: #047857; }
+        .status-intransit { background-color: #dbeafe; color: #1d4ed8; }
+        .status-ofd { background-color: #fef3c7; color: #b45309; }
+        .status-rto { background-color: #fee2e2; color: #dc2626; }
+        .status-ndr { background-color: #ffedd5; color: #c2410c; }
+        .status-cancelled { background-color: #f1f5f9; color: #475569; }
+        .row-delivered { border-left: 3px solid #10b981; }
+        .row-intransit { border-left: 3px solid #3b82f6; }
+        .row-ofd { border-left: 3px solid #f59e0b; }
+        .row-exception { border-left: 3px solid #ef4444; }
     </style>
 </head>
-<body class="text-slate-600 antialiased h-screen flex overflow-hidden selection:bg-slate-200 selection:text-slate-900">
+<body class="text-slate-600 antialiased h-screen flex overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-72 bg-white border-r border-slate-200 flex flex-col justify-between z-20 hidden md:flex shadow-[4px_0_24px_rgba(0,0,0,0.01)]">
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between z-20 hidden lg:flex">
         <div>
-            <!-- Logo Area -->
-            <div class="h-16 flex items-center px-6 border-b border-slate-100">
+            <div class="h-16 flex items-center px-5 border-b border-slate-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 bg-slate-900 text-white rounded-lg flex items-center justify-center">
-                        <iconify-icon icon="solar:box-minimalistic-linear" width="20" stroke-width="1.5"></iconify-icon>
-                    </div>
+                    <img src="assets/favicon.ico" alt="UrbaneBolt" class="w-9 h-9 rounded-lg object-contain">
                     <div class="flex flex-col">
-                        <span class="font-bold tracking-tight text-slate-900 text-sm leading-none">URBANEBOLT</span>
-                        <span class="text-[10px] font-medium text-slate-400 mt-1 tracking-wider uppercase"></span>
+                        <span class="font-bold tracking-tight text-slate-900 text-sm">URBANEBOLT</span>
+                        <span class="text-[10px] font-medium text-slate-400 tracking-wider uppercase">Operations</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Navigation -->
-            <nav class="p-4 space-y-1">
-                <div class="px-3 pb-2 pt-2">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Core Data</p>
+            <nav class="p-3 space-y-1">
+                <div class="px-3 pb-2 pt-3">
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Dashboard</p>
                 </div>
                 
-                <a href="index.html" data-nav-href="index.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:widget-2-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg bg-slate-900 text-white">
+                    <iconify-icon icon="solar:widget-2-linear" width="18"></iconify-icon>
                     Overview
                 </a>
                 
-                <a href="manifest.html" data-nav-href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:clipboard-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="manifest.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
+                    <iconify-icon icon="solar:clipboard-list-linear" width="18"></iconify-icon>
                     Master Manifest
                 </a>
 
-                <a href="riders.html" data-nav-href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:user-hand-up-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="riders.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
+                    <iconify-icon icon="solar:user-hand-up-linear" width="18"></iconify-icon>
                     Rider Allocation
                 </a>
 
-                <div class="px-3 pb-2 pt-6">
-                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">NDR & Finance</p>
+                <div class="px-3 pb-2 pt-5">
+                    <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Finance & NDR</p>
                 </div>
 
-                <a href="cod.html" data-nav-href="cod.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:bill-list-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="cod.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
+                    <iconify-icon icon="solar:bill-list-linear" width="18"></iconify-icon>
                     COD Reconciliation
                 </a>
                 
-                <a href="exceptions.html" data-nav-href="exceptions.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all border border-transparent hover:border-slate-200/50 hover:shadow-sm hover:bg-slate-50 hover:text-slate-900 text-slate-500">
-                    <iconify-icon icon="solar:danger-triangle-linear" class="group-hover:text-slate-900 transition-colors" width="18"></iconify-icon>
+                <a href="exceptions.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
+                    <iconify-icon icon="solar:danger-triangle-linear" width="18"></iconify-icon>
                     RTO & Exceptions
-                    <span id="exceptionsBadge" class="ml-auto bg-rose-100 text-rose-600 py-0.5 px-2 rounded-full text-[10px] font-semibold hidden">0</span>
+                    <span id="exceptionBadge" class="ml-auto bg-rose-100 text-rose-600 py-0.5 px-2 rounded-full text-[10px] font-semibold hidden">0</span>
                 </a>
             </nav>
         </div>
 
-        <!-- User Profile -->
-        <div class="p-4 border-t border-slate-100">
-            <div class="flex items-center gap-3 w-full p-2">
-                <img src="https://ui-avatars.com/api/?name=Hub+Manager&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full shadow-sm">
+        <div class="p-3 border-t border-slate-100">
+            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
+                <img src="https://ui-avatars.com/api/?name=Hub+Manager&background=0f172a&color=fff" alt="User" class="w-8 h-8 rounded-full">
                 <div class="flex flex-col">
                     <span class="text-xs font-semibold text-slate-900">Hub Manager</span>
-                    <span class="text-[10px] text-slate-500">UrbaneBolt Dashboard</span>
+                    <span class="text-[10px] text-slate-500">Operations</span>
                 </div>
             </div>
         </div>
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-slate-50/50">
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
         
-        <!-- Header -->
-        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30">
+        <!-- Top Bar -->
+        <header class="bg-white border-b border-slate-200 px-6 py-4">
+            <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-4">
-                <h1 class="text-lg font-semibold text-slate-900 tracking-tight">Dashboard</h1>
-                <div class="h-4 w-px bg-slate-200"></div>
-                <div class="flex items-center gap-2 text-xs text-slate-500 bg-slate-100/50 px-2 py-1 rounded-md border border-slate-200">
+                    <h1 class="text-xl font-bold text-slate-900">Operations Dashboard</h1>
+                    <div id="connectionStatus" class="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-500">
+                        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                        <span>Initializing...</span>
+                    </div>
+                    <div id="rateLimitStatus" class="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-600 hidden">
+                        <iconify-icon icon="solar:shield-check-linear" width="12"></iconify-icon>
+                        <span>0/60 req/min</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-500">
                     <iconify-icon icon="solar:calendar-linear" width="14"></iconify-icon>
                     <span id="currentDate"></span>
                 </div>
-                <div class="hidden md:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Pickup Date</span>
-                    <input id="pickupDateFilter" type="date" class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0">
-                </div>
-                <div class="hidden md:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Shipment Type</span>
-                    <select id="shipmentTypeFilter" class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0 cursor-pointer">
-                        <option value="ALL">All</option>
-                        <option value="PPD">PPD</option>
-                        <option value="COD">COD</option>
-                    </select>
-                </div>
             </div>
             
-            <div class="flex items-center gap-2">
-                <div class="relative">
-                    <iconify-icon icon="solar:magnifer-linear" class="absolute left-3 top-2.5 text-slate-400" width="16"></iconify-icon>
-                    <input
-                        data-awb-search
-                        type="text"
-                        placeholder="AWB number"
-                        class="w-56 bg-slate-50 border border-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-200 focus:bg-white transition-all placeholder:text-slate-400 text-slate-900"
-                        autocomplete="off"
-                    >
+            <!-- SEARCH BAR - PROMINENT -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                <div class="flex flex-col lg:flex-row gap-4">
+                    <!-- AWB Search -->
+                    <div class="flex-1">
+                        <label class="block text-xs font-semibold text-slate-700 mb-2">
+                            <iconify-icon icon="solar:magnifer-linear" width="14" class="mr-1"></iconify-icon>
+                            Track Shipment by AWB
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" id="awbSearchInput" 
+                                placeholder="Enter AWB number (e.g., 200000077431)" 
+                                class="flex-1 text-sm bg-white border border-slate-300 rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <button onclick="trackSingleAWB()" id="trackBtn"
+                                class="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2 whitespace-nowrap">
+                                <iconify-icon icon="solar:magnifer-linear" width="16"></iconify-icon>
+                                Track AWB
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    data-search-btn
-                    class="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2"
-                >
-                    <iconify-icon icon="solar:magnifer-linear" width="16"></iconify-icon>
-                    Search
-                </button>
-                <button
-                    type="button"
-                    data-clear-search
-                    class="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors"
-                    aria-label="Clear filters"
-                >
-                    Clear
-                </button>
             </div>
+
+                    <!-- Bulk Search -->
+                    <div class="lg:w-80">
+                        <label class="block text-xs font-semibold text-slate-700 mb-2">
+                            <iconify-icon icon="solar:layers-linear" width="14" class="mr-1"></iconify-icon>
+                            Bulk Track (Multiple AWBs)
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" id="bulkAwbInput" 
+                                placeholder="AWB1, AWB2, AWB3..." 
+                                class="flex-1 text-sm bg-white border border-slate-300 rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <button onclick="trackBulkAWB()" id="bulkTrackBtn"
+                                class="px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                <iconify-icon icon="solar:upload-linear" width="16"></iconify-icon>
+                                Bulk
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1">Max 20 AWBs per request • Comma separated</p>
+                    </div>
+                </div>
+
+                <!-- Filters Row -->
+                <div class="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-slate-200">
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Date Filter</label>
+                        <input type="date" id="dateFilter" class="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2">
+                        </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Shipment Type</label>
+                        <select id="typeFilter" class="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 min-w-[120px]">
+                            <option value="ALL">All Types</option>
+                            <option value="COD">COD Only</option>
+                            <option value="PPD">Prepaid Only</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Status</label>
+                        <select id="statusFilter" class="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 min-w-[140px]">
+                            <option value="ALL">All Statuses</option>
+                            <option value="DELIVERED">Delivered</option>
+                            <option value="INTRANSIT">In Transit</option>
+                            <option value="OFD">Out for Delivery</option>
+                            <option value="RTO">RTO</option>
+                            <option value="NDR">NDR</option>
+                            <option value="CANCELLED">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end gap-2 ml-auto">
+                        <button onclick="clearFilters()" class="px-3 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
+                            Clear Filters
+                        </button>
+                        <button onclick="applyFilters()" class="px-4 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 flex items-center gap-2">
+                            <iconify-icon icon="solar:filter-linear" width="14"></iconify-icon>
+                            Apply Filters
+                        </button>
+                </div>
+                        </div>
+                    </div>
         </header>
 
         <!-- Scrollable Dashboard Area -->
-        <div class="flex-1 overflow-y-auto p-8 space-y-8">
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
             
-            <!-- High Level Metrics -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <!-- Metric 1: Total Shipments Today -->
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-                            <iconify-icon icon="solar:hand-money-linear" width="22"></iconify-icon>
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                            <iconify-icon icon="solar:box-linear" width="20"></iconify-icon>
                         </div>
-                        <span id="metric-label-total" class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Total Shipments</span>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase">Total</span>
                     </div>
-                    <h3 id="metric-total-today" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
-                    <p id="metric-subtotal-total" class="text-xs text-slate-400 mt-1">Shipments for selected pickup date</p>
-                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-blue-600 h-1.5 rounded-full" style="width: 65%"></div>
+                    <h3 id="kpi-total" class="text-2xl font-bold text-slate-900">0</h3>
+                    <p class="text-[10px] text-slate-400 mt-1">Shipments tracked</p>
+            </div>
+
+                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <iconify-icon icon="solar:verified-check-linear" width="20"></iconify-icon>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase">Delivered</span>
                     </div>
+                    <h3 id="kpi-delivered" class="text-2xl font-bold text-emerald-600">0</h3>
+                    <p class="text-[10px] text-slate-400 mt-1">Successfully delivered</p>
                 </div>
 
-                <!-- Metric 2: Delivered Shipments Today -->
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2.5 bg-violet-50 text-violet-600 rounded-lg">
-                            <iconify-icon icon="solar:box-linear" width="22"></iconify-icon>
+                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                            <iconify-icon icon="solar:delivery-linear" width="20"></iconify-icon>
                         </div>
-                        <span id="metric-label-delivered" class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Delivered</span>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase">In Transit</span>
                     </div>
-                    <h3 id="metric-delivered-today" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
-                    <p id="metric-subtotal-delivered" class="text-xs text-slate-400 mt-1">Last status = Delivered</p>
-                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-violet-600 h-1.5 rounded-full" style="width: 82%"></div>
-                    </div>
+                    <h3 id="kpi-intransit" class="text-2xl font-bold text-amber-600">0</h3>
+                    <p class="text-[10px] text-slate-400 mt-1">Out for delivery</p>
                 </div>
 
-                <!-- Metric 3: In-Transit Shipments -->
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                            <iconify-icon icon="solar:verified-check-linear" width="22"></iconify-icon>
+                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="p-2 bg-rose-50 text-rose-600 rounded-lg">
+                            <iconify-icon icon="solar:danger-triangle-linear" width="20"></iconify-icon>
                         </div>
-                        <span id="metric-label-intransit" class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">In Progress</span>
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase">Exceptions</span>
                     </div>
-                    <h3 id="metric-intransit" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
-                    <p id="metric-subtotal-intransit" class="text-xs text-slate-400 mt-1">In transit / out for delivery</p>
-                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-emerald-600 h-1.5 rounded-full" style="width: 88%"></div>
-                    </div>
-                </div>
-
-                <!-- Metric 4: Undelivered / Failed -->
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2.5 bg-rose-50 text-rose-600 rounded-lg">
-                            <iconify-icon icon="solar:siren-linear" width="22"></iconify-icon>
-                        </div>
-                        <span id="metric-label-undelivered" class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Exceptions</span>
-                    </div>
-                    <h3 id="metric-undelivered" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0</h3>
-                    <p id="metric-subtotal-undelivered" class="text-xs text-slate-400 mt-1">UD / RTO / NDR / failed</p>
-                    <div class="mt-4 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                        <div class="bg-rose-500 h-1.5 rounded-full" style="width: 15%"></div>
-                    </div>
+                    <h3 id="kpi-exceptions" class="text-2xl font-bold text-rose-600">0</h3>
+                    <p class="text-[10px] text-slate-400 mt-1">RTO / NDR / Failed</p>
                 </div>
             </div>
 
-            <!-- Secondary Metrics Row (Delivery Rate, COD, Revenue) -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <!-- Delivery Success Rate -->
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                            <iconify-icon icon="solar:chart-outline" width="22"></iconify-icon>
-                        </div>
-                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Delivery Success Rate</span>
-                    </div>
-                    <h3 id="metric-dsr" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">0%</h3>
-                    <p class="text-xs text-slate-400 mt-1">Delivered vs total shipments for the day</p>
-                    <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
-                        <span class="font-semibold text-slate-700">Avg TAT</span>
-                        <span id="metric-avg-tat" class="font-semibold text-slate-900">—</span>
-                    </div>
-                </div>
-
-                <!-- COD Collected Today -->
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2.5 bg-blue-50 text-blue-600 rounded-lg">
-                            <iconify-icon icon="solar:wallet-linear" width="22"></iconify-icon>
-                        </div>
-                    <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">COD Collected Today</span>
-                    </div>
-                    <h3 id="metric-cod-collected" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">—</h3>
-                    <p class="text-xs text-slate-400 mt-1">Cash collected on successful deliveries</p>
-                </div>
-
-                <!-- Amount Earned Today -->
-                <div class="bg-white rounded-xl p-6 premium-border premium-shadow group hover:border-slate-300 transition-all">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
-                            <iconify-icon icon="solar:card-linear" width="22"></iconify-icon>
-                        </div>
-                        <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Amount Earned Today</span>
-                    </div>
-                    <h3 id="metric-earned" class="text-2xl font-bold text-slate-900 tracking-tight mt-1">—</h3>
-                    <p class="text-xs text-slate-400 mt-1">Total declared value of delivered shipments</p>
-                </div>
-            </div>
-
-            <!-- Insights (Charts) -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Status Distribution -->
-                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">Status Mix</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">Distribution across key shipment states</p>
-                        </div>
-                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Live</span>
-                    </div>
-                    <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5 items-center">
-                        <div class="flex items-center justify-center">
-                            <svg id="chart-status-donut" viewBox="0 0 120 120" class="w-36 h-36">
-                                <circle cx="60" cy="60" r="44" fill="none" stroke="#e2e8f0" stroke-width="14"></circle>
-                                <!-- segments injected by JS -->
-                                <circle cx="60" cy="60" r="32" fill="white"></circle>
-                                <text id="chart-status-center" x="60" y="60" text-anchor="middle" dominant-baseline="middle" class="fill-slate-900" style="font-size:12px;font-weight:700;">0</text>
-                                <text x="60" y="74" text-anchor="middle" dominant-baseline="middle" class="fill-slate-500" style="font-size:9px;font-weight:600;">Shipments</text>
-                            </svg>
-                        </div>
-                        <div id="chart-status-legend" class="space-y-2 text-xs">
-                            <!-- legend injected by JS -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 7-Day Volume Trend -->
-                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">7‑Day Volume Trend</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">Shipments created per day</p>
-                        </div>
-                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Last 7d</span>
-                    </div>
-                    <div class="mt-6">
-                        <div id="chart-trend" class="flex items-end gap-2 h-40">
-                            <!-- bars injected by JS -->
-                        </div>
-                        <div id="chart-trend-labels" class="mt-3 grid grid-cols-7 gap-2 text-[10px] text-slate-400">
-                            <!-- labels injected by JS -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- COD Split -->
-                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-900">COD vs PPD</h3>
-                            <p class="text-xs text-slate-500 mt-0.5">Shipment mix by collectable value</p>
-                        </div>
-                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Split</span>
-                    </div>
-                    <div class="mt-6 space-y-4">
-                        <div>
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="font-semibold text-slate-700">COD Shipments</span>
-                                <span id="chart-cod-count" class="font-semibold text-slate-900">0</span>
-                            </div>
-                            <div class="mt-2 w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div id="chart-cod-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="font-semibold text-slate-700">PPD / ₹0 COD</span>
-                                <span id="chart-prepaid-count" class="font-semibold text-slate-900">0</span>
-                            </div>
-                            <div class="mt-2 w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                                <div id="chart-prepaid-bar" class="bg-slate-700 h-2 rounded-full" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="pt-2 border-t border-slate-100 text-xs text-slate-500">
-                            <span class="font-semibold text-slate-700">COD collected today:</span>
-                            <span id="chart-cod-collected-inline" class="font-semibold text-slate-900">—</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Main Data Table -->
-            <div class="bg-white rounded-xl premium-border premium-shadow flex flex-col overflow-hidden h-[650px]">
-                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-900">Live Shipments</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Real-time status from core database</p>
-                    </div>
+            <!-- Secondary KPIs -->
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
                     <div class="flex items-center gap-3">
-                        <div class="hidden xl:flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
-                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Legend</span>
-                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Delivered
-                            </span>
-                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
-                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> In Progress
-                            </span>
-                            <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/60">
-                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Cancelled
-                            </span>
+                        <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <iconify-icon icon="solar:chart-2-linear" width="20"></iconify-icon>
                         </div>
-                        <div class="flex gap-2">
-                            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5">
-                                <span class="text-xs font-medium text-slate-500">Service:</span>
-                                <select class="text-xs bg-transparent border-none p-0 text-slate-900 font-semibold focus:ring-0 cursor-pointer">
-                                    <option>All</option>
-                                    <option>Surface</option>
-                                    <option>Air Express</option>
-                                </select>
+                        <div>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase">Success Rate</p>
+                            <h3 id="kpi-dsr" class="text-xl font-bold text-slate-900">0%</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                            <iconify-icon icon="solar:wallet-linear" width="20"></iconify-icon>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase">COD Value</p>
+                            <h3 id="kpi-cod" class="text-xl font-bold text-slate-900">₹0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-violet-50 text-violet-600 rounded-lg">
+                            <iconify-icon icon="solar:clock-circle-linear" width="20"></iconify-icon>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase">Avg TAT</p>
+                            <h3 id="kpi-tat" class="text-xl font-bold text-slate-900">-- hrs</h3>
                             </div>
-                            <button class="px-3 py-1.5 text-xs font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-sm flex items-center gap-2">
-                                <iconify-icon icon="solar:export-linear"></iconify-icon> Export
-                            </button>
-                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="bg-white rounded-xl premium-border premium-shadow overflow-hidden">
+                <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Shipment Results</h2>
+                        <p id="resultsSubtitle" class="text-xs text-slate-500 mt-0.5">Track AWBs to see results</p>
+                        <p id="lastSyncInfo" class="text-[10px] text-slate-400 mt-1 hidden">
+                            <iconify-icon icon="solar:clock-circle-linear" width="10" class="mr-1"></iconify-icon>
+                            <span id="lastSyncTime">Never synced</span> • Auto-refresh every hour
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="autoRefreshShipments()" id="refreshBtn" class="px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 flex items-center gap-2" title="Refresh all tracked shipments">
+                            <iconify-icon icon="solar:refresh-linear" width="14" id="refreshIcon"></iconify-icon>
+                            Refresh All
+                        </button>
+                        <button onclick="exportData()" class="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                            <iconify-icon icon="solar:download-linear" width="14"></iconify-icon>
+                            Export CSV
+                        </button>
                     </div>
                 </div>
                 
-                <div class="flex-1 overflow-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">AWB</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Customer</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Route (Org - Dest)</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Service Details</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap text-right">Value (COD/Dec)</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Status</th>
-                                <th class="py-3 px-6 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-200 whitespace-nowrap">Rider / Update</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">AWB Number</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Route</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Value</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Last Update</th>
+                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100 text-sm" id="shipmentTableBody">
-                            <!-- Populated by JS -->
+                        <tbody id="resultsTable" class="divide-y divide-slate-100 text-sm">
+                            <tr>
+                                <td colspan="8" class="py-16 text-center">
+                                    <div class="flex flex-col items-center">
+                                        <iconify-icon icon="solar:magnifer-linear" width="48" class="text-slate-300 mb-3"></iconify-icon>
+                                        <p class="text-slate-500 font-medium">No shipments tracked yet</p>
+                                        <p class="text-slate-400 text-xs mt-1">Enter an AWB number above to track a shipment</p>
+                                    </div>
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
                 
-                <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-xs text-slate-500">
-                    <span id="tableStatus">Loading…</span>
-                    <div class="flex gap-1">
-                        <button class="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50">
-                            <iconify-icon icon="solar:alt-arrow-left-linear"></iconify-icon>
-                        </button>
-                        <button class="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50">
-                            <iconify-icon icon="solar:alt-arrow-right-linear"></iconify-icon>
-                        </button>
+                <div id="tableFooter" class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-xs text-slate-500 hidden">
+                    <span id="tableStatus">0 shipments</span>
+                    <div id="pagination" class="flex items-center gap-2">
+                        <button onclick="prevPage()" id="prevBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Previous</button>
+                        <span id="pageInfo">Page 1 of 1</span>
+                        <button onclick="nextPage()" id="nextBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Next</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Secondary Info Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Recent Updates (Log) -->
-                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
-                    <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <iconify-icon icon="solar:history-linear" class="text-slate-400"></iconify-icon>
-                        Recent Delivery & NDR Updates
-                    </h3>
-                    <div id="recentUpdatesList" class="space-y-4">
-                        <div class="text-xs text-slate-500">Loading updates…</div>
-                    </div>
-                </div>
-
-                <!-- Financial Mini-View -->
-                <div class="bg-white rounded-xl premium-border premium-shadow p-6">
-                    <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <iconify-icon icon="solar:wallet-linear" class="text-slate-400"></iconify-icon>
-                        COD Reconciliation
-                    </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Collected (Delivered)</p>
-                            <p id="miniCodCollected" class="text-lg font-bold text-slate-900">—</p>
-                            <p class="text-[10px] text-slate-400 mt-1">From delivered COD shipments</p>
-                        </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Outstanding</p>
-                            <p id="miniCodOutstanding" class="text-lg font-bold text-orange-600">—</p>
-                            <p class="text-[10px] text-slate-400 mt-1">COD not yet delivered</p>
-                        </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">COD Shipments</p>
-                            <p id="miniCodCount" class="text-lg font-bold text-slate-900">—</p>
-                            <p class="text-[10px] text-slate-400 mt-1">collectable_value &gt; 0</p>
-                        </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                            <p class="text-[10px] uppercase text-slate-500 font-semibold tracking-wider">Last Refresh</p>
-                            <p id="miniLastRefresh" class="text-lg font-bold text-slate-900">—</p>
-                            <p class="text-[10px] text-slate-400 mt-1">From current fetch</p>
-                        </div>
-                    </div>
-                    <div class="mt-4 text-xs">
-                        <a href="cod.html" class="text-blue-600 font-semibold hover:underline">Open COD page</a>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-
+                            </div>
     </main>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-8 flex flex-col items-center shadow-2xl">
+            <iconify-icon icon="solar:refresh-linear" width="40" class="text-blue-600 animate-spin mb-4"></iconify-icon>
+            <p class="text-slate-900 font-semibold">Tracking Shipments...</p>
+            <p id="loadingStatus" class="text-slate-500 text-sm mt-1">Connecting to API</p>
+                </div>
+            </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <iconify-icon id="toastIcon" icon="solar:check-circle-linear" width="20"></iconify-icon>
+        <span id="toastMessage">Success</span>
+        </div>
+
     <script>
-        /**
-         * @typedef {Object} Shipment
-         * @property {string} awbNumber
-         * @property {string=} order_number
-         * @property {string=} customerName
-         * @property {string=} customerCode
-         * @property {string=} origin
-         * @property {string=} originPincode
-         * @property {string=} destination
-         * @property {string=} destinationPincode
-         * @property {number=} collectable_value
-         * @property {number=} declared_value
-         * @property {string=} serviceType
-         * @property {string=} product_type
-         * @property {string=} statusDescription
-         * @property {string=} statusCode
-         * @property {string=} edd
-         * @property {string=} riderName
-         * @property {number=} attemptCount
-         * @property {string=} first_udReason
-         * @property {string=} last_udReason
-         */
+        // =====================================================
+        // STATE MANAGEMENT
+        // =====================================================
+        const State = {
+            shipments: [],
+            filteredShipments: [],
+            currentPage: 1,
+            pageSize: 20,
+            isLoading: false,
+            trackedAwbs: new Set(),
+        };
 
-        /**
-         * @typedef {Object} SupabaseResponse
-         * @property {Shipment[]=} data
-         * @property {{ message?: string } | null} error
-         */
+        // =====================================================
+        // PERSISTENT DATA LAYER (localStorage)
+        // =====================================================
+        const DataLayer = {
+            STORAGE_KEY: 'urbanebolt_shipments',
+            AWB_LIST_KEY: 'urbanebolt_tracked_awbs',
+            LAST_SYNC_KEY: 'urbanebolt_last_sync',
+            SYNC_INTERVAL: 60 * 60 * 1000, // 1 hour in milliseconds
 
-        /** @type {Shipment[]} */
-        let currentRows = [];
-        /** @type {number} */
-        let requestSequence = 0;
-        /** @type {AbortController | null} */
-        let activeController = null;
-
-        /** @type {HTMLTableSectionElement | null} */
-        const tbody = document.getElementById('shipmentTableBody');
-        /** @type {HTMLSpanElement | null} */
-        const tableStatus = document.getElementById('tableStatus');
-        /** @type {HTMLElement | null} */
-        const metricTotalToday = document.getElementById('metric-total-today');
-        /** @type {HTMLElement | null} */
-        const metricDeliveredToday = document.getElementById('metric-delivered-today');
-        /** @type {HTMLElement | null} */
-        const metricInTransit = document.getElementById('metric-intransit');
-        /** @type {HTMLElement | null} */
-        const metricUndelivered = document.getElementById('metric-undelivered');
-        /** @type {HTMLElement | null} */
-        const metricDsr = document.getElementById('metric-dsr');
-        /** @type {HTMLElement | null} */
-        const metricCodCollected = document.getElementById('metric-cod-collected');
-        /** @type {HTMLElement | null} */
-        const metricEarned = document.getElementById('metric-earned');
-        /** @type {HTMLInputElement | null} */
-        const searchInput = document.querySelector('[data-awb-search]');
-        /** @type {HTMLButtonElement | null} */
-        const clearButton = document.querySelector('[data-clear-search]');
-        /** @type {HTMLButtonElement | null} */
-        const searchButton = document.querySelector('[data-search-btn]');
-        /** @type {HTMLInputElement | null} */
-        const pickupDateFilter = document.getElementById('pickupDateFilter');
-        /** @type {HTMLSelectElement | null} */
-        const shipmentTypeFilter = document.getElementById('shipmentTypeFilter');
-        /** @type {any} */
-        const supabaseClient = window.supabaseClient || window.supabase;
-
-        /** @type {{ pickupDateKey: string, shipmentType: 'ALL'|'COD'|'PPD' }} */
-        const dashboardFilters = { pickupDateKey: '', shipmentType: 'ALL' };
-
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
-        }
-
-        /**
-         * Escape dynamic strings to avoid XSS when rendering HTML.
-         * @param {any} value
-         */
-        function escapeHtml(value) {
-            return String(value ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        }
-
-        function setMetricText(element, text) {
-            if (element) {
-                element.textContent = text;
-            }
-        }
-
-        /**
-         * @param {string=} status
-         * @param {string=} code
-         * @returns {'delivered'|'in-progress'|'cancelled'|'exception'|'other'}
-         */
-        function getStatusCategory(status, code) {
-            const c = String(code || '').trim().toUpperCase();
-            const s = String(status || '').trim().toLowerCase();
-
-            const deliveredCodes = new Set(['DEL', 'DLV', 'DELIVERED']);
-            const inProgressCodes = new Set(['INT', 'OFD', 'OFD1', 'OFD2', 'IT', 'INTRANSIT']);
-            const cancelledCodes = new Set(['CNL', 'CAN', 'CX', 'CANC', 'CNCL', 'CANCELED', 'CANCELLED']);
-            const exceptionCodes = new Set(['UD', 'RTO', 'NDR', 'FAILED', 'FAIL']);
-
-            if (deliveredCodes.has(c) || s.includes('delivered')) return 'delivered';
-            if (cancelledCodes.has(c) || s.includes('cancel')) return 'cancelled';
-            if (exceptionCodes.has(c) || s.includes('undeliver') || s.includes('failed') || s.includes('rto') || s.includes('ndr')) return 'exception';
-            if (inProgressCodes.has(c) || s.includes('in progress') || s.includes('in-transit') || s.includes('in transit') || s.includes('out for delivery') || s.includes('transit')) return 'in-progress';
-            return 'other';
-        }
-
-        /**
-         * @param {string=} status
-         * @param {string=} code
-         */
-        function getStatusPill(status, code) {
-            const category = getStatusCategory(status, code);
-            const theme = {
-                delivered: { pill: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60', dot: 'bg-emerald-500' },
-                'in-progress': { pill: 'bg-blue-50 text-blue-700 border border-blue-200/60', dot: 'bg-blue-500' },
-                cancelled: { pill: 'bg-rose-50 text-rose-700 border border-rose-200/60', dot: 'bg-rose-500' },
-                exception: { pill: 'bg-amber-50 text-amber-800 border border-amber-200/60', dot: 'bg-amber-500' },
-                other: { pill: 'bg-slate-100 text-slate-700 border border-slate-200', dot: 'bg-slate-400' }
-            }[category];
-
-            const safeStatus = escapeHtml(status || 'Unknown');
-            const safeCode = escapeHtml((code || '').toString());
-            return `
-                <span class="inline-flex items-center gap-2 px-2 py-1 rounded-md text-xs font-semibold ${theme.pill}" title="${safeCode}">
-                    <span class="w-1.5 h-1.5 rounded-full ${theme.dot}"></span>
-                    ${safeStatus}
-                </span>
-            `;
-        }
-
-        /**
-         * @param {string=} status
-         * @param {string=} code
-         */
-        function getStatusRowClass(status, code) {
-            return `status-row status--${getStatusCategory(status, code)}`;
-        }
-
-        /**
-         * @param {string} text
-         */
-        function setTableStatus(text) {
-            if (!tableStatus) return;
-            tableStatus.textContent = text;
-        }
-
-        function renderSkeletonRows(rowCount = 6) {
-            if (!tbody) return;
-            setTableStatus('Loading…');
-            const skeletonRow = `
-                <tr class="animate-pulse">
-                    <td class="py-4 px-6">
-                        <div class="h-3 w-24 bg-slate-200 rounded mb-2"></div>
-                        <div class="h-2.5 w-28 bg-slate-200 rounded"></div>
-                    </td>
-                    <td class="py-4 px-6">
-                        <div class="h-3 w-36 bg-slate-200 rounded mb-2"></div>
-                        <div class="h-2.5 w-32 bg-slate-200 rounded"></div>
-                    </td>
-                    <td class="py-4 px-6">
-                        <div class="h-3 w-20 bg-slate-200 rounded mb-2"></div>
-                        <div class="h-2.5 w-24 bg-slate-200 rounded"></div>
-                    </td>
-                    <td class="py-4 px-6">
-                        <div class="h-3 w-20 bg-slate-200 rounded mb-2"></div>
-                        <div class="h-2.5 w-24 bg-slate-200 rounded ml-auto"></div>
-                    </td>
-                    <td class="py-4 px-6">
-                        <div class="h-3 w-20 bg-slate-200 rounded mb-2"></div>
-                        <div class="h-2.5 w-24 bg-slate-200 rounded"></div>
-                    </td>
-                    <td class="py-4 px-6">
-                        <div class="h-3 w-28 bg-slate-200 rounded mb-2"></div>
-                        <div class="h-2.5 w-16 bg-slate-200 rounded"></div>
-                    </td>
-                    <td class="py-4 px-6">
-                        <div class="h-3 w-24 bg-slate-200 rounded mb-2"></div>
-                        <div class="h-2.5 w-24 bg-slate-200 rounded"></div>
-                    </td>
-                </tr>
-            `;
-            tbody.innerHTML = Array.from({ length: rowCount }).map(() => skeletonRow).join('');
-        }
-
-        function renderEmptyState(message) {
-            if (!tbody) return;
-            setTableStatus(message);
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="py-10 px-6 text-center text-sm text-slate-500 bg-slate-50">
-                        ${escapeHtml(message)}
-                    </td>
-                </tr>
-            `;
-        }
-
-        /**
-         * @param {string} message
-         */
-        function renderError(message) {
-            if (!tbody) return;
-            setTableStatus(message);
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="py-10 px-6 text-center text-sm text-rose-600 bg-rose-50/60">
-                        ${escapeHtml(message)}
-                    </td>
-                </tr>
-            `;
-        }
-
-        /**
-         * @param {Shipment[]} rows
-         */
-        function renderTable(rows) {
-            if (!tbody) return;
-            if (!rows.length) {
-                const term = (searchInput?.value || '').trim();
-                const pickupKey = dashboardFilters.pickupDateKey;
-                const type = dashboardFilters.shipmentType;
-                const filterLabel = `${pickupKey || 'All dates'} / ${type || 'ALL'}`;
-
-                if (term) {
-                    renderEmptyState(`No shipments match "${term}" for ${filterLabel}.`);
-                } else {
-                    renderEmptyState(`No shipments for ${filterLabel}.`);
+            // Load cached shipments from localStorage
+            loadCache() {
+                try {
+                    const cached = localStorage.getItem(this.STORAGE_KEY);
+                    return cached ? JSON.parse(cached) : [];
+                } catch (e) {
+                    console.warn('[DataLayer] Failed to load cache:', e);
+                    return [];
                 }
-                return;
-            }
-            setTableStatus(`Showing ${rows.length} shipment${rows.length === 1 ? '' : 's'}`);
+            },
 
-            tbody.innerHTML = rows.map(row => `
-                <tr class="${getStatusRowClass(row.statusDescription, row.statusCode)} hover:bg-slate-50 transition-colors group cursor-pointer border-b border-slate-50 last:border-0" data-status-category="${getStatusCategory(row.statusDescription, row.statusCode)}">
-                    <td class="py-3 px-6">
-                        <button type="button" data-awb-link="${escapeHtml(row.awbNumber)}" class="font-mono text-xs font-semibold text-blue-600 group-hover:underline focus:outline-none focus:text-blue-700">
-                            ${escapeHtml(row.awbNumber)}
-                        </button>
-                    </td>
-                    <td class="py-3 px-6">
-                        <div class="flex flex-col">
-                            <span class="text-[11px] font-medium text-slate-600 mt-0.5">${escapeHtml(row.customerName || '—')}</span>
-                            <span class="text-[10px] text-slate-400 mt-0.5 font-mono">${row.order_number ? `Ord: ${escapeHtml(row.order_number)}` : ''}</span>
-                        </div>
-                    </td>
-                    <td class="py-3 px-6">
-                        <div class="flex flex-col gap-1">
-                            <div class="flex items-center gap-2 text-xs text-slate-700 font-medium">
-                                <span>${escapeHtml(row.origin || '—')}</span>
-                                <iconify-icon icon="solar:arrow-right-linear" class="text-slate-300"></iconify-icon>
-                                <span>${escapeHtml(row.destination || '—')}</span>
-                            </div>
-                            <div class="text-[10px] text-slate-400 font-mono">${escapeHtml(row.originPincode || '—')} -> ${escapeHtml(row.destinationPincode || '—')}</div>
-                        </div>
-                    </td>
-                    <td class="py-3 px-6">
-                         <div class="flex flex-col gap-1">
-                            <span class="inline-flex w-fit items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                                ${escapeHtml(row.serviceType || '—')}
-                            </span>
-                            <span class="text-[10px] text-slate-500">${escapeHtml(row.product_type || '—')}</span>
-                        </div>
-                    </td>
-                    <td class="py-3 px-6 text-right">
-                        <div class="flex flex-col items-end">
-                            <span class="text-xs font-bold text-slate-900">${formatCurrency(row.collectable_value)}</span>
-                            <span class="text-[10px] text-slate-400">Dec: ${formatCurrency(row.declared_value)}</span>
-                        </div>
-                    </td>
-                    <td class="py-3 px-6">
-                        <div class="flex flex-col items-start gap-1">
-                            ${getStatusPill(row.statusDescription, row.statusCode)}
-                            <span class="text-[10px] text-slate-400 ml-1">EDD: ${escapeHtml(row.edd || '—')}</span>
-                        </div>
-                    </td>
-                    <td class="py-3 px-6">
-                        <div class="flex items-center gap-2">
-                             <div class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-[10px]">
-                                <iconify-icon icon="solar:user-linear"></iconify-icon>
-                             </div>
-                             <div class="flex flex-col">
-                                <span class="text-[11px] font-medium text-slate-700">${escapeHtml(row.riderName || 'Unassigned')}</span>
-                                ${typeof row.attemptCount === 'number' && row.attemptCount > 0 ? `<span class="text-[10px] text-orange-600 font-medium">Attempt: ${row.attemptCount}</span>` : ''}
-                             </div>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
+            // Save shipments to localStorage
+            saveCache(shipments) {
+                try {
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(shipments));
+                } catch (e) {
+                    console.warn('[DataLayer] Failed to save cache:', e);
+                }
+            },
+
+            // Get list of tracked AWBs
+            getTrackedAwbs() {
+                try {
+                    const awbs = localStorage.getItem(this.AWB_LIST_KEY);
+                    return awbs ? JSON.parse(awbs) : [];
+                } catch (e) {
+                    return [];
+                }
+            },
+
+            // Save tracked AWB list
+            saveTrackedAwbs(awbs) {
+                try {
+                    localStorage.setItem(this.AWB_LIST_KEY, JSON.stringify([...awbs]));
+                } catch (e) {
+                    console.warn('[DataLayer] Failed to save AWB list:', e);
+                }
+            },
+
+            // Add AWB to tracked list
+            addAwb(awb) {
+                const awbs = new Set(this.getTrackedAwbs());
+                awbs.add(String(awb));
+                this.saveTrackedAwbs(awbs);
+            },
+
+            // Get last sync timestamp
+            getLastSync() {
+                return parseInt(localStorage.getItem(this.LAST_SYNC_KEY) || '0');
+            },
+
+            // Update last sync timestamp
+            updateLastSync() {
+                localStorage.setItem(this.LAST_SYNC_KEY, Date.now().toString());
+            },
+
+            // Check if sync is due
+            isSyncDue() {
+                const lastSync = this.getLastSync();
+                return Date.now() - lastSync >= this.SYNC_INTERVAL;
+            },
+
+            // Clear all data
+            clearAll() {
+                localStorage.removeItem(this.STORAGE_KEY);
+                localStorage.removeItem(this.AWB_LIST_KEY);
+                localStorage.removeItem(this.LAST_SYNC_KEY);
+            }
+        };
+
+        // =====================================================
+        // INITIALIZATION
+        // =====================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set current date
+            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-IN', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+            document.getElementById('dateFilter').valueAsDate = new Date();
+
+            // Keyboard shortcuts
+            document.getElementById('awbSearchInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') trackSingleAWB();
+            });
+            document.getElementById('bulkAwbInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') trackBulkAWB();
+            });
+
+            // Check API connection
+            checkApiConnection();
+
+            // Load cached data immediately
+            loadCachedData();
+
+            // Start auto-refresh (after a short delay to let API initialize)
+            setTimeout(() => {
+                // Do initial sync if due
+                if (DataLayer.isSyncDue() && DataLayer.getTrackedAwbs().length > 0) {
+                    console.log('[AutoSync] Initial sync triggered');
+                    autoRefreshShipments();
+                }
+            }, 1000);
+
+            // Set up hourly auto-refresh
+            setInterval(() => {
+                if (DataLayer.getTrackedAwbs().length > 0) {
+                    console.log('[AutoSync] Hourly refresh triggered');
+                    autoRefreshShipments();
+                }
+            }, DataLayer.SYNC_INTERVAL);
+
+            // Also refresh when tab becomes visible (if sync is due)
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && DataLayer.isSyncDue() && DataLayer.getTrackedAwbs().length > 0) {
+                    console.log('[AutoSync] Visibility refresh triggered');
+                    autoRefreshShipments();
+                }
+            });
+
+            // Update "last synced X ago" display every minute
+            setInterval(updateLastSyncDisplay, 60000);
+        });
+
+        // =====================================================
+        // LOAD CACHED DATA
+        // =====================================================
+        function loadCachedData() {
+            const cachedShipments = DataLayer.loadCache();
+            const trackedAwbs = DataLayer.getTrackedAwbs();
+
+            if (cachedShipments.length > 0) {
+                State.shipments = cachedShipments;
+                State.trackedAwbs = new Set(trackedAwbs);
+                
+                // Sort by most recent first
+                sortShipmentsByDate();
+                
+                applyFiltersAndRender();
+                updateLastSyncDisplay();
+                
+                const lastSync = DataLayer.getLastSync();
+                if (lastSync > 0) {
+                    const ago = formatTimeAgo(lastSync);
+                    showToast(`Loaded ${cachedShipments.length} shipments (last updated ${ago})`, 'info');
+                }
+            }
         }
 
-        /**
-         * @param {string} awbTerm
-         */
-        async function fetchShipments(awbTerm) {
-            if (!supabaseClient || typeof supabaseClient.from !== 'function') {
-                renderEmptyState("Supabase is not configured. Set window.SUPABASE_URL and window.SUPABASE_ANON_KEY in assets/config.js, then reload.");
-                return;
-            }
+        // Sort State.shipments by most recent date
+        function sortShipmentsByDate() {
+            State.shipments.sort((a, b) => {
+                const dateA = parseShipmentDate(a.lastUpdate);
+                const dateB = parseShipmentDate(b.lastUpdate);
+                return dateB - dateA; // Descending (most recent first)
+            });
+        }
 
-            requestSequence += 1;
-            const requestId = requestSequence;
-            activeController?.abort();
-            activeController = new AbortController();
-
-            renderSkeletonRows();
-
-            const trimmed = (awbTerm || "").trim();
-            /** @type {Shipment[]} */
-            let rows = [];
-
-            if (trimmed.length > 0) {
-                const exact = /** @type {SupabaseResponse} */ (await supabaseClient
-                    .from('shipments')
-                    .select('*')
-                    .eq('awbNumber', trimmed)
-                    .abortSignal(activeController.signal));
-
-                if (requestId !== requestSequence) {
-                    return;
-                }
-
-                if (!exact.error && exact.data && exact.data.length > 0) {
-                    rows = exact.data;
+        // Update last sync display in UI
+        function updateLastSyncDisplay() {
+            const lastSyncInfo = document.getElementById('lastSyncInfo');
+            const lastSyncTime = document.getElementById('lastSyncTime');
+            const lastSync = DataLayer.getLastSync();
+            
+            if (State.shipments.length > 0) {
+                lastSyncInfo.classList.remove('hidden');
+                if (lastSync > 0) {
+                    lastSyncTime.textContent = `Last synced ${formatTimeAgo(lastSync)}`;
                 } else {
-                    const fallback = /** @type {SupabaseResponse} */ (await supabaseClient
-                        .from('shipments')
-                        .select('*')
-                        // awbNumber may be numeric in some schemas; cast to text to support partial match.
-                        .filter('awbNumber::text', 'ilike', `%${trimmed}%`)
-                        .abortSignal(activeController.signal));
-
-                    if (requestId !== requestSequence) {
-                        return;
-                    }
-
-                    if (!fallback.error && fallback.data) {
-                        rows = fallback.data;
-                    } else {
-                        if (fallback?.error) {
-                            console.error('Supabase search (ilike) error', fallback.error);
-                            renderError(`Supabase error: ${fallback.error.message || 'Unknown error'}`);
-                        } else {
-                            renderEmptyState("No shipment found for this AWB");
-                        }
-                        return;
-                    }
+                    lastSyncTime.textContent = 'Not synced yet';
                 }
             } else {
-                const response = /** @type {SupabaseResponse} */ (await supabaseClient
-                    .from('shipments')
-                    .select('*')
-                    .abortSignal(activeController.signal));
+                lastSyncInfo.classList.add('hidden');
+            }
+        }
 
-                if (requestId !== requestSequence) {
-                    return;
+        // =====================================================
+        // AUTO REFRESH SHIPMENTS (Hourly)
+        // =====================================================
+        async function autoRefreshShipments() {
+            const trackedAwbs = DataLayer.getTrackedAwbs();
+            
+            if (trackedAwbs.length === 0) {
+                console.log('[AutoSync] No AWBs to refresh');
+                return;
+            }
+
+            // Don't interrupt if user is manually loading
+            if (State.isLoading) {
+                console.log('[AutoSync] Skipping - manual load in progress');
+                return;
+            }
+
+            console.log(`[AutoSync] Refreshing ${trackedAwbs.length} shipments...`);
+            setLoading(true, `Auto-refreshing ${trackedAwbs.length} shipments...`);
+
+            try {
+                // Process in batches of 20 (API limit)
+                const batchSize = 20;
+                let successCount = 0;
+                let failCount = 0;
+
+                for (let i = 0; i < trackedAwbs.length; i += batchSize) {
+                    const batch = trackedAwbs.slice(i, i + batchSize);
+                    
+                    // Check rate limit before each batch
+                    const apiStatus = API.getStatus();
+                    if (apiStatus.requestsLastMinute >= 50) {
+                        console.log('[AutoSync] Approaching rate limit, pausing...');
+                        await new Promise(r => setTimeout(r, 60000)); // Wait 1 minute
+                    }
+
+                    const results = await API.tracking.getMultiple(batch);
+                    
+                    results.forEach(result => {
+                        if (result.success && result.data) {
+                            const shipment = normalizeShipmentData(result.data);
+                            const existingIndex = State.shipments.findIndex(s => s.awb === shipment.awb);
+                            if (existingIndex >= 0) {
+                                State.shipments[existingIndex] = shipment;
+                            } else {
+                                State.shipments.unshift(shipment);
+                            }
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    });
+
+                    // Small delay between batches
+                    if (i + batchSize < trackedAwbs.length) {
+                        await new Promise(r => setTimeout(r, 500));
+                    }
                 }
 
-                if (!response.error && response.data) {
-                    rows = response.data;
+                // Sort by most recent first
+                sortShipmentsByDate();
+
+                // Save updated data to cache
+                DataLayer.saveCache(State.shipments);
+                DataLayer.updateLastSync();
+
+                applyFiltersAndRender();
+                updateRateLimitStatus();
+
+                console.log(`[AutoSync] Complete: ${successCount} updated, ${failCount} failed`);
+                showToast(`Auto-refresh complete: ${successCount} shipments updated`, 'success');
+                updateLastSyncDisplay();
+
+            } catch (error) {
+                console.error('[AutoSync] Error:', error);
+                showToast('Auto-refresh failed. Will retry later.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Format time ago helper
+        function formatTimeAgo(timestamp) {
+            const seconds = Math.floor((Date.now() - timestamp) / 1000);
+            if (seconds < 60) return 'just now';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
+        }
+
+        // =====================================================
+        // API CONNECTION & RATE LIMIT MONITORING
+        // =====================================================
+        function checkApiConnection() {
+            const status = document.getElementById('connectionStatus');
+            const rateLimit = document.getElementById('rateLimitStatus');
+            
+            try {
+                if (typeof API !== 'undefined') {
+                    status.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>API Ready</span>';
+                    status.className = 'flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700';
+                    rateLimit.classList.remove('hidden');
+                    updateRateLimitStatus();
                 } else {
-                    if (response?.error) {
-                        console.error('Supabase fetch all error', response.error);
-                        renderError(`Supabase error: ${response.error.message || 'Unknown error'}`);
+                    status.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>Loading API...</span>';
+                    status.className = 'flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700';
+                }
+            } catch (e) {
+                status.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>API Error</span>';
+                status.className = 'flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-700';
+            }
+        }
+
+        function updateRateLimitStatus() {
+            const rateLimit = document.getElementById('rateLimitStatus');
+            try {
+                const apiStatus = API.getStatus();
+                const used = apiStatus.requestsLastMinute || 0;
+                const max = API.MAX_REQUESTS_PER_MINUTE || 60;
+                const percentage = (used / max) * 100;
+                
+                rateLimit.innerHTML = `<iconify-icon icon="solar:shield-check-linear" width="12"></iconify-icon><span>${used}/${max} req/min</span>`;
+                
+                if (percentage >= 80) {
+                    rateLimit.className = 'flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-600';
+                } else if (percentage >= 50) {
+                    rateLimit.className = 'flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-600';
+            } else {
+                    rateLimit.className = 'flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-600';
+                }
+
+                // Show circuit breaker status if open
+                if (apiStatus.circuitOpen) {
+                    rateLimit.innerHTML = '<iconify-icon icon="solar:shield-warning-linear" width="12"></iconify-icon><span>Rate Limited - Wait 30s</span>';
+                    rateLimit.className = 'flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-600';
+                }
+            } catch (e) {
+                console.warn('Could not get API status:', e);
+            }
+        }
+
+        // Update rate limit status every 5 seconds
+        setInterval(updateRateLimitStatus, 5000);
+
+        // =====================================================
+        // LOADING STATE
+        // =====================================================
+        function setLoading(loading, message = 'Connecting to API') {
+            State.isLoading = loading;
+            const overlay = document.getElementById('loadingOverlay');
+            const loadingStatus = document.getElementById('loadingStatus');
+            
+            if (loading) {
+                overlay.classList.remove('hidden');
+                loadingStatus.textContent = message;
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // =====================================================
+        // TOAST NOTIFICATIONS
+        // =====================================================
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMessage');
+
+            msg.textContent = message;
+            
+            if (type === 'success') {
+                toast.className = 'fixed bottom-6 right-6 bg-emerald-600 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all duration-300 z-50';
+                icon.setAttribute('icon', 'solar:check-circle-linear');
+            } else if (type === 'error') {
+                toast.className = 'fixed bottom-6 right-6 bg-rose-600 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all duration-300 z-50';
+                icon.setAttribute('icon', 'solar:danger-triangle-linear');
+            } else {
+                toast.className = 'fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all duration-300 z-50';
+                icon.setAttribute('icon', 'solar:info-circle-linear');
+            }
+
+            toast.style.transform = 'translateY(0)';
+            toast.style.opacity = '1';
+
+            setTimeout(() => {
+                toast.style.transform = 'translateY(20px)';
+                toast.style.opacity = '0';
+            }, 3000);
+        }
+
+        // =====================================================
+        // TRACK SINGLE AWB
+        // =====================================================
+        async function trackSingleAWB() {
+            const input = document.getElementById('awbSearchInput');
+            const awb = input.value.trim();
+
+            if (!awb) {
+                showToast('Please enter an AWB number', 'error');
+                input.focus();
+                return;
+            }
+
+            // Validate AWB format (alphanumeric)
+            if (!/^[a-zA-Z0-9]+$/.test(awb)) {
+                showToast('Invalid AWB format. Use only letters and numbers.', 'error');
+                return;
+            }
+
+            setLoading(true, `Tracking AWB: ${awb}`);
+
+            try {
+                const data = await API.tracking.getByAwb(awb);
+                
+                if (data) {
+                    const shipment = normalizeShipmentData(data);
+                    
+                    // Check if already tracked, update if so
+                    const existingIndex = State.shipments.findIndex(s => s.awb === shipment.awb);
+                    if (existingIndex >= 0) {
+                        State.shipments[existingIndex] = shipment;
                     } else {
-                        renderEmptyState("No shipment found for this AWB");
+                        State.shipments.unshift(shipment);
                     }
-                    return;
+                    State.trackedAwbs.add(shipment.awb);
+                    
+                    // Persist to localStorage
+                    DataLayer.addAwb(shipment.awb);
+                    DataLayer.saveCache(State.shipments);
+                    DataLayer.updateLastSync();
+                    
+                    applyFiltersAndRender();
+                    updateLastSyncDisplay();
+                    showToast(`AWB ${awb} tracked successfully`, 'success');
+                    input.value = '';
+                } else {
+                    showToast(`No shipment found for AWB: ${awb}`, 'error');
                 }
+            } catch (error) {
+                console.error('[Track] Error:', error);
+                handleApiError(error, awb);
+            } finally {
+                setLoading(false);
+                updateRateLimitStatus();
             }
-
-            currentRows = rows;
-            if (requestId !== requestSequence) {
-                return;
-            }
-            if (trimmed.length === 0 && rows.length === 0) {
-                renderEmptyState("No shipments available (or access is blocked by RLS).");
-                return;
-            }
-            if (trimmed.length > 0 && rows.length === 0) {
-                renderEmptyState("No shipment found for this AWB");
-                return;
-            }
-            renderDashboardFromRows(rows, trimmed);
         }
 
-        /**
-         * Apply Pickup Date + Shipment Type filtering.
-         * If awbTerm is provided (search), we bypass filters and show the searched rows.
-         * @param {Shipment[]} rows
-         * @param {string} awbTerm
-         */
-        function renderDashboardFromRows(rows, awbTerm) {
-            const data = window.DashboardData;
-            const pickupKey = dashboardFilters.pickupDateKey;
-            const type = dashboardFilters.shipmentType;
-
-            /** @type {Shipment[]} */
-            let working = rows;
-            // Always apply filters (search results must respect selected date/type)
-            if (data?.filterRowsByPickupDate) working = data.filterRowsByPickupDate(working, pickupKey);
-            if (data?.filterRowsByShipmentType) working = data.filterRowsByShipmentType(working, type);
-
-            renderTable(working);
-            computeAndRenderMetrics(working);
-            renderCharts(working);
-            renderSecondaryPanels(working);
-
-            // Update metric label context
-            const labelSuffix = pickupKey ? `(${pickupKey})` : '(All)';
-            const labelTotal = document.getElementById('metric-label-total');
-            const subTotal = document.getElementById('metric-subtotal-total');
-            if (labelTotal) labelTotal.textContent = `Total Shipments ${labelSuffix}`;
-            if (subTotal) subTotal.textContent = pickupKey ? 'Shipments for selected pickup date' : 'All shipments (no pickup date filter)';
+        function handleApiError(error, awb = '') {
+            const msg = error.message || 'Unknown error';
+            
+            // Provide user-friendly error messages
+            if (msg.includes('Circuit breaker')) {
+                showToast('Too many requests. Please wait 30 seconds.', 'error');
+            } else if (msg.includes('timeout')) {
+                showToast('Request timed out. The API is slow or unavailable.', 'error');
+            } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+                showToast('Network error. Check your connection or API may be down.', 'error');
+            } else if (msg.includes('HTTP 429')) {
+                showToast('Rate limit exceeded on server. Wait and try again.', 'error');
+            } else if (msg.includes('HTTP 401') || msg.includes('HTTP 403')) {
+                showToast('Authentication required or access denied.', 'error');
+            } else if (msg.includes('HTTP 404')) {
+                showToast(`AWB ${awb} not found in system.`, 'error');
+            } else if (msg.includes('HTTP 5')) {
+                showToast('Server error. The API is experiencing issues.', 'error');
+                } else {
+                showToast(msg, 'error');
+            }
         }
 
-        /**
-         * Render panels that must never contain mock data:
-         * - sidebar exception badge
-         * - recent updates feed
-         * - COD mini reconciliation card
-         * @param {Shipment[]} rows
-         */
-        function renderSecondaryPanels(rows) {
-            const data = window.DashboardData;
-            const escape = data?.escapeHtml || escapeHtml;
-            const format = data?.formatCurrency || formatCurrency;
-            const getRowDate = data?.getRowDate || ((r) => {
-                const raw = r.created_at || r.order_date || r.updated_at || r.edd;
-                if (!raw) return null;
-                const d = new Date(raw);
-                return isNaN(d.getTime()) ? null : d;
-            });
-            const relativeTime = data?.relativeTime || ((d) => d ? '' : '');
-            const statusPillHtml = data?.statusPillHtml || ((s, c) => getStatusPill(s, c));
+        // =====================================================
+        // TRACK BULK AWBs
+        // =====================================================
+        async function trackBulkAWB() {
+            const input = document.getElementById('bulkAwbInput');
+            const rawInput = input.value.trim();
 
-            // Sidebar badge: exception count from rows
-            const badge = document.getElementById('exceptionsBadge');
-            if (badge) {
-                const exceptionCodes = new Set(['UD', 'RTO', 'NDR']);
-                const count = rows.filter(r => exceptionCodes.has(String(r.statusCode || '').toUpperCase())).length;
-                badge.textContent = String(count);
-                badge.classList.toggle('hidden', count <= 0);
+            if (!rawInput) {
+                showToast('Please enter AWB numbers (comma separated)', 'error');
+                input.focus();
+                return;
             }
 
-            // Recent updates (derived from the most recent rows)
-            const list = document.getElementById('recentUpdatesList');
-            if (list) {
-                const now = new Date();
-                const sorted = [...rows].sort((a, b) => {
-                    const da = getRowDate(a)?.getTime() || 0;
-                    const db = getRowDate(b)?.getTime() || 0;
-                    return db - da;
+            // Parse AWBs - support comma, space, newline separation
+            const awbs = rawInput
+                .split(/[,\s\n]+/)
+                .map(a => a.trim())
+                .filter(a => a && /^[a-zA-Z0-9]+$/.test(a));
+
+            if (awbs.length === 0) {
+                showToast('No valid AWB numbers found', 'error');
+                return;
+            }
+
+            if (awbs.length > 20) {
+                showToast(`Maximum 20 AWBs allowed. You entered ${awbs.length}.`, 'error');
+                return;
+            }
+
+            setLoading(true, `Tracking ${awbs.length} AWBs (batch mode)`);
+
+            try {
+                const results = await API.tracking.getMultiple(awbs);
+                
+                let successCount = 0;
+                let failCount = 0;
+
+                results.forEach(result => {
+                    if (result.success && result.data) {
+                        const shipment = normalizeShipmentData(result.data);
+                        const existingIndex = State.shipments.findIndex(s => s.awb === shipment.awb);
+                        if (existingIndex >= 0) {
+                            State.shipments[existingIndex] = shipment;
+                        } else {
+                            State.shipments.unshift(shipment);
+                        }
+                        State.trackedAwbs.add(shipment.awb);
+                        DataLayer.addAwb(shipment.awb); // Persist AWB
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
                 });
-                const top = sorted.slice(0, 6);
-                if (top.length === 0) {
-                    list.innerHTML = `<div class="text-xs text-slate-500">No updates available.</div>`;
+
+                // Persist all data to localStorage
+                DataLayer.saveCache(State.shipments);
+                DataLayer.updateLastSync();
+
+                applyFiltersAndRender();
+                updateLastSyncDisplay();
+                
+                if (failCount > 0) {
+                    showToast(`${successCount} tracked, ${failCount} failed`, 'info');
                 } else {
-                    list.innerHTML = top.map((r) => {
-                        const awb = escape(r.awbNumber || '—');
-                        const title = `${escape(r.statusDescription || r.statusCode || 'Update')}: ${awb}`;
-                        const reason = escape(r.last_udReason || r.first_udReason || '');
-                        const rider = escape(r.riderName || 'Unassigned');
-                        const t = relativeTime(getRowDate(r), now) || '';
-                        const chip = statusPillHtml(r.statusDescription, r.statusCode);
-                        return `
-                            <div class="flex gap-3 items-start">
-                                <div class="mt-0.5">${chip}</div>
-                                <div class="min-w-0">
-                                    <p class="text-xs font-semibold text-slate-900 truncate">${title}</p>
-                                    ${reason ? `<p class="text-[11px] text-slate-500 mt-0.5 truncate">Reason: ${reason}</p>` : ''}
-                                    <p class="text-[10px] text-slate-400 mt-1">Rider: ${rider}</p>
-                                </div>
-                                <span class="ml-auto text-[10px] text-slate-400">${escape(t)}</span>
-                            </div>
-                        `;
-                    }).join('');
+                    showToast(`${successCount} AWBs tracked successfully`, 'success');
                 }
+                
+                input.value = '';
+            } catch (error) {
+                console.error('[Bulk Track] Error:', error);
+                handleApiError(error);
+            } finally {
+                setLoading(false);
+                updateRateLimitStatus();
             }
+        }
 
-            // COD mini reconciliation (computed from shipments)
-            const miniCodCollected = document.getElementById('miniCodCollected');
-            const miniCodOutstanding = document.getElementById('miniCodOutstanding');
-            const miniCodCount = document.getElementById('miniCodCount');
-            const miniLastRefresh = document.getElementById('miniLastRefresh');
-
-            const deliveredCodes = new Set(['DEL']);
-            const codRows = rows.filter(r => (Number(r.collectable_value) || 0) > 0);
-            const deliveredCod = codRows.filter(r => deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
-            const outstandingCod = codRows.filter(r => !deliveredCodes.has(String(r.statusCode || '').toUpperCase()));
-
-            const collectedAmount = deliveredCod.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
-            const outstandingAmount = outstandingCod.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
-
-            if (miniCodCollected) miniCodCollected.textContent = format(collectedAmount);
-            if (miniCodOutstanding) miniCodOutstanding.textContent = format(outstandingAmount);
-            if (miniCodCount) miniCodCount.textContent = String(codRows.length);
-            if (miniLastRefresh) miniLastRefresh.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        // =====================================================
+        // NORMALIZE API DATA
+        // =====================================================
+        /**
+         * Normalize API response data to internal format
+         * API Response Fields:
+         *   awbNumber, orderNumber, pieces, addedOn, invoiceDate, invoiceNumber,
+         *   shipperName, origin, destination, currentLocation, edd,
+         *   currentStatusDateTime, currentStatusCode, currentStatusCodeDescription,
+         *   currentReasonCode, currentReasonCodeDescription, isRto, weight,
+         *   productType (PPD/COD), delPod, scans[]
+         */
+        function normalizeShipmentData(apiData) {
+            // Calculate route string
+            const route = `${apiData.origin || 'N/A'} → ${apiData.destination || 'N/A'}`;
+            
+            // Determine invoice/value from invoiceNumber or use 0 for PPD
+            const invoiceValue = parseFloat(apiData.invoiceNumber || 0) || 0;
+            
+            return {
+                awb: String(apiData.awbNumber || ''),
+                orderNumber: apiData.orderNumber || '',
+                customer: apiData.shipperName || 'N/A',
+                origin: apiData.origin || 'N/A',
+                destination: apiData.destination || 'N/A',
+                route: route,
+                currentLocation: apiData.currentLocation || apiData.destination || '',
+                value: apiData.productType === 'COD' ? invoiceValue : 0,
+                status: apiData.currentStatusCodeDescription || apiData.currentStatusCode || 'Unknown',
+                statusCode: normalizeStatusCode(apiData.currentStatusCode),
+                type: apiData.productType || 'PPD',
+                lastUpdate: apiData.currentStatusDateTime || '',
+                addedOn: apiData.addedOn || '',
+                edd: apiData.edd || '',
+                weight: apiData.weight || 0,
+                pieces: apiData.pieces || 1,
+                isRto: apiData.isRto || false,
+                rtoStatus: apiData.rto_status || 0,
+                delPod: apiData.delPod || '',
+                reasonCode: apiData.currentReasonCode || '',
+                reasonDescription: apiData.currentReasonCodeDescription || '',
+                scans: apiData.scans || [],
+                rawData: apiData,
+            };
         }
 
         /**
-         * Compute "today" logistics metrics (counts and amounts).
-         * Gracefully handles missing date fields by treating undated rows as "today".
-         * @param {Shipment[]} rows
+         * Normalize status codes to internal categories
+         * Status Codes from API:
+         *   DDL = Delivered, OFD = Out for Delivery, MAN = Manifested,
+         *   PKD = Picked Up, IND = In-scanned, BGD = Bagged, DPD = Departed,
+         *   ARD = Arrived, RDC = Reached DC, DBG = De-bagged, DDS = Delivery Scheduled,
+         *   UDD = Un-delivered, RTO = Return to Origin, CAN = Cancelled
          */
-        function computeAndRenderMetrics(rows) {
-            const deliveredCodes = ['DEL'];
-            const inTransitCodes = ['INT', 'OFD', 'OFD1', 'OFD2'];
-            const exceptionCodes = ['UD', 'RTO', 'NDR'];
+        function normalizeStatusCode(code) {
+            const c = (code || '').toUpperCase();
+            
+            // Delivered
+            if (c === 'DDL') return 'DELIVERED';
+            
+            // Out for Delivery
+            if (c === 'OFD' || c === 'DDS') return 'OFD';
+            
+            // In Transit (various stages)
+            if (['MAN', 'PKD', 'IND', 'BGD', 'DPD', 'ARD', 'RDC', 'DBG'].includes(c)) return 'INTRANSIT';
+            
+            // RTO
+            if (c === 'RTO' || c.startsWith('RTO')) return 'RTO';
+            
+            // Undelivered / NDR (Non-Delivery Report)
+            if (c === 'UDD' || c === 'NDR') return 'NDR';
+            
+            // Cancelled
+            if (c === 'CAN' || c === 'CANCELLED') return 'CANCELLED';
+            
+            return 'OTHER';
+        }
 
-            const total = rows.length;
-            const delivered = rows.filter(r => deliveredCodes.includes(String(r.statusCode || '').toUpperCase()));
-            const inTransit = rows.filter(r => inTransitCodes.includes(String(r.statusCode || '').toUpperCase()));
-            const exceptions = rows.filter(r => exceptionCodes.includes(String(r.statusCode || '').toUpperCase()));
+        // =====================================================
+        // FILTERS
+        // =====================================================
+        function applyFilters() {
+            applyFiltersAndRender();
+            showToast('Filters applied', 'info');
+        }
 
-            const dsr = total ? (delivered.length / total) * 100 : 0;
+        function clearFilters() {
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('typeFilter').value = 'ALL';
+            document.getElementById('statusFilter').value = 'ALL';
+            applyFiltersAndRender();
+            showToast('Filters cleared', 'info');
+        }
 
-            const codCollected = delivered.reduce(
-                (acc, r) => acc + (Number(r.collectable_value) || 0),
-                0
-            );
+        function applyFiltersAndRender() {
+            const typeFilter = document.getElementById('typeFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
 
-            const amountEarned = delivered.reduce(
-                (acc, r) => acc + (Number(r.declared_value) || 0),
-                0
-            );
+            State.filteredShipments = State.shipments.filter(s => {
+                if (typeFilter !== 'ALL' && s.type !== typeFilter) return false;
+                if (statusFilter !== 'ALL' && s.statusCode !== statusFilter) return false;
+                return true;
+            });
 
-            setMetricText(metricTotalToday, String(total));
-            setMetricText(metricDeliveredToday, String(delivered.length));
-            setMetricText(metricInTransit, String(inTransit.length));
-            setMetricText(metricUndelivered, String(exceptions.length));
-            setMetricText(metricDsr, `${dsr.toFixed(1)}%`);
-            setMetricText(metricCodCollected, formatCurrency(codCollected));
-            setMetricText(metricEarned, formatCurrency(amountEarned));
+            // Sort by most recent date first (lastUpdate field)
+            State.filteredShipments.sort((a, b) => {
+                const dateA = parseShipmentDate(a.lastUpdate);
+                const dateB = parseShipmentDate(b.lastUpdate);
+                return dateB - dateA; // Descending (most recent first)
+            });
 
-            // Avg TAT (pickup -> last status)
-            const tatEl = document.getElementById('metric-avg-tat');
-            const tatHours = window.DashboardData?.tatHours;
-            if (tatEl && typeof tatHours === 'function') {
-                const values = rows.map(r => tatHours(r)).filter(v => typeof v === 'number' && isFinite(v) && v >= 0);
-                if (!values.length) {
-                    tatEl.textContent = '—';
-                } else {
-                    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-                    tatEl.textContent = `${avg.toFixed(1)}h`;
+            State.currentPage = 1;
+            renderKPIs();
+            renderTable();
+        }
+
+        /**
+         * Parse date strings from API format: "07 Jul 2025, 14:39" or "21 Nov 2025, 13:19"
+         * Returns timestamp for sorting
+         */
+        function parseShipmentDate(dateStr) {
+            if (!dateStr) return 0;
+            
+            try {
+                // Format: "DD MMM YYYY, HH:MM"
+                const months = {
+                    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                };
+                
+                // Parse "07 Jul 2025, 14:39"
+                const match = dateStr.match(/(\d{1,2})\s+(\w{3})\s+(\d{4}),?\s*(\d{1,2}):(\d{2})/);
+                if (match) {
+                    const [, day, monthStr, year, hour, minute] = match;
+                    const month = months[monthStr];
+                    if (month !== undefined) {
+                        return new Date(parseInt(year), month, parseInt(day), parseInt(hour), parseInt(minute)).getTime();
+                    }
                 }
+                
+                // Fallback: try native Date parsing
+                const parsed = new Date(dateStr);
+                return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+            } catch (e) {
+                return 0;
             }
         }
 
-        function renderCharts(rows) {
-            const deliveredCodes = ['DEL'];
-            const inTransitCodes = ['INT', 'OFD', 'OFD1', 'OFD2'];
-            const cancelledCodes = ['CNL', 'CAN', 'CX', 'CANC', 'CNCL'];
-            const exceptionCodes = ['UD', 'RTO', 'NDR'];
+        // =====================================================
+        // RENDER KPIs
+        // =====================================================
+        function renderKPIs() {
+            const data = State.filteredShipments;
+            const total = data.length;
+            const delivered = data.filter(s => s.statusCode === 'DELIVERED').length;
+            const inTransit = data.filter(s => ['INTRANSIT', 'OFD'].includes(s.statusCode)).length;
+            const exceptions = data.filter(s => ['RTO', 'NDR', 'CANCELLED'].includes(s.statusCode)).length;
+            const codValue = data.filter(s => s.type === 'COD').reduce((sum, s) => sum + (s.value || 0), 0);
+            const successRate = total > 0 ? Math.round((delivered / total) * 100) : 0;
 
-            const donut = document.getElementById('chart-status-donut');
-            const donutCenter = document.getElementById('chart-status-center');
-            const legend = document.getElementById('chart-status-legend');
-            const trend = document.getElementById('chart-trend');
-            const trendLabels = document.getElementById('chart-trend-labels');
-            const codCountEl = document.getElementById('chart-cod-count');
-            const prepaidCountEl = document.getElementById('chart-prepaid-count');
-            const codBar = document.getElementById('chart-cod-bar');
-            const prepaidBar = document.getElementById('chart-prepaid-bar');
-            const codCollectedInline = document.getElementById('chart-cod-collected-inline');
+            document.getElementById('kpi-total').textContent = total.toLocaleString();
+            document.getElementById('kpi-delivered').textContent = delivered.toLocaleString();
+            document.getElementById('kpi-intransit').textContent = inTransit.toLocaleString();
+            document.getElementById('kpi-exceptions').textContent = exceptions.toLocaleString();
+            document.getElementById('kpi-dsr').textContent = successRate + '%';
+            document.getElementById('kpi-cod').textContent = '₹' + codValue.toLocaleString('en-IN');
 
-            if (!donut || !legend || !trend || !trendLabels || !codBar || !prepaidBar) return;
+            // Update exception badge
+            const badge = document.getElementById('exceptionBadge');
+            if (exceptions > 0) {
+                badge.textContent = exceptions;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
 
-            // ---- Status Donut (DEL / IN TRANSIT / FAILED) ----
-            const total = rows.length;
-            const delivered = rows.filter(r => deliveredCodes.includes(String(r.statusCode || '').toUpperCase())).length;
-            const inTransit = rows.filter(r => inTransitCodes.includes(String(r.statusCode || '').toUpperCase())).length;
-            const cancelled = rows.filter(r => cancelledCodes.includes(String(r.statusCode || '').toUpperCase())).length;
-            const exceptions = rows.filter(r => {
-                const code = String(r.statusCode || '').toUpperCase();
-                // keep categories mutually exclusive (cancelled should not also be counted as exception)
-                if (cancelledCodes.includes(code)) return false;
-                if (exceptionCodes.includes(code)) return true;
-                if (!deliveredCodes.includes(code) && !inTransitCodes.includes(code) && (r.attemptCount || 0) > 0) return true;
-                return false;
-            }).length;
-            const other = Math.max(0, total - delivered - inTransit - cancelled - exceptions);
+        // =====================================================
+        // RENDER TABLE
+        // =====================================================
+        function renderTable() {
+            const tbody = document.getElementById('resultsTable');
+            const footer = document.getElementById('tableFooter');
+            const subtitle = document.getElementById('resultsSubtitle');
+            const data = State.filteredShipments;
 
-            const segments = [
-                { key: 'Delivered', value: delivered, color: '#10b981' },
-                { key: 'In Progress', value: inTransit, color: '#3b82f6' },
-                { key: 'Cancelled', value: cancelled, color: '#f43f5e' },
-                { key: 'Exceptions', value: exceptions, color: '#f59e0b' },
-                { key: 'Other', value: other, color: '#64748b' }
-            ].filter(s => s.value > 0);
-
-            // remove old segments (keep base circles + text)
-            donut.querySelectorAll('[data-seg="1"]').forEach(n => n.remove());
-            let offset = 0;
-            const r = 44;
-            const c = 2 * Math.PI * r;
-            segments.forEach((s) => {
-                const pct = total ? (s.value / total) : 0;
-                const dash = c * pct;
-                const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                el.setAttribute('data-seg', '1');
-                el.setAttribute('cx', '60');
-                el.setAttribute('cy', '60');
-                el.setAttribute('r', String(r));
-                el.setAttribute('fill', 'none');
-                el.setAttribute('stroke', s.color);
-                el.setAttribute('stroke-width', '14');
-                el.setAttribute('stroke-linecap', 'round');
-                el.setAttribute('stroke-dasharray', `${dash} ${c - dash}`);
-                el.setAttribute('stroke-dashoffset', String(-offset));
-                el.setAttribute('transform', 'rotate(-90 60 60)');
-                donut.insertBefore(el, donut.querySelector('circle[cx="60"][r="32"]'));
-                offset += dash;
-            });
-
-            if (donutCenter) donutCenter.textContent = String(total);
-
-            legend.innerHTML = segments.map(s => {
-                const pct = total ? ((s.value / total) * 100).toFixed(1) : '0.0';
-                return `
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span class="inline-block w-2 h-2 rounded-full" style="background:${s.color}"></span>
-                            <span class="font-semibold text-slate-700">${s.key}</span>
+            if (data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="py-16 text-center">
+                            <div class="flex flex-col items-center">
+                                <iconify-icon icon="solar:magnifer-linear" width="48" class="text-slate-300 mb-3"></iconify-icon>
+                                <p class="text-slate-500 font-medium">${State.shipments.length === 0 ? 'No shipments tracked yet' : 'No shipments match filters'}</p>
+                                <p class="text-slate-400 text-xs mt-1">${State.shipments.length === 0 ? 'Enter an AWB number above to track a shipment' : 'Try adjusting your filters'}</p>
                         </div>
-                        <div class="text-slate-500">${s.value} <span class="text-slate-400">(${pct}%)</span></div>
-                    </div>
+                        </td>
+                    </tr>
                 `;
-            }).join('');
-
-            // ---- 7-day trend ----
-            const now = new Date();
-            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const days = Array.from({ length: 7 }).map((_, i) => {
-                const d = new Date(startOfToday);
-                d.setDate(startOfToday.getDate() - (6 - i));
-                return d;
-            });
-
-            function getRowDate(row) {
-                const raw = row.created_at || row.order_date || row.edd;
-                if (!raw) return null;
-                const d = new Date(raw);
-                return isNaN(d.getTime()) ? null : d;
+                footer.classList.add('hidden');
+                subtitle.textContent = 'Track AWBs to see results';
+                return;
             }
 
-            const counts = days.map((day) => {
-                const next = new Date(day);
-                next.setDate(day.getDate() + 1);
-                return rows.filter((r) => {
-                    const d = getRowDate(r);
-                    if (!d) return false;
-                    return d >= day && d < next;
-                }).length;
-            });
+            // Pagination
+            const totalPages = Math.ceil(data.length / State.pageSize);
+            const start = (State.currentPage - 1) * State.pageSize;
+            const end = start + State.pageSize;
+            const pageData = data.slice(start, end);
 
-            const max = Math.max(1, ...counts);
-            trend.innerHTML = counts.map((count) => {
-                const h = Math.round((count / max) * 100);
+            tbody.innerHTML = pageData.map(s => {
+                const rowClass = getRowClass(s.statusCode);
+                const statusClass = getStatusClass(s.statusCode);
+                
                 return `
-                    <div class="flex-1 bg-slate-100 rounded-md overflow-hidden">
-                        <div class="w-full bg-slate-900 rounded-md chart-bar" style="--h:${h}%;height:${h}%"></div>
-                    </div>
-                `;
-            }).join('');
+                <tr class="${rowClass} hover:bg-slate-50 cursor-pointer" onclick="viewShipment('${escapeHtml(s.awb)}')">
+                    <td class="py-3 px-5">
+                        <span class="font-mono text-xs font-bold text-blue-600">${escapeHtml(s.awb)}</span>
+                        ${s.orderNumber ? `<div class="text-[10px] text-slate-400 mt-0.5">#${escapeHtml(s.orderNumber)}</div>` : ''}
+                    </td>
+                    <td class="py-3 px-5">
+                        <div class="text-xs font-medium text-slate-900 truncate max-w-[180px]" title="${escapeHtml(s.customer)}">${escapeHtml(s.customer)}</div>
+                        ${s.currentLocation ? `<div class="text-[10px] text-slate-400">@ ${escapeHtml(s.currentLocation)}</div>` : ''}
+                    </td>
+                    <td class="py-3 px-5 text-xs">
+                        <span class="text-slate-500">${escapeHtml(s.origin)}</span>
+                        <iconify-icon icon="solar:arrow-right-linear" width="12" class="mx-1 text-slate-300"></iconify-icon>
+                        <span class="text-slate-900 font-medium">${escapeHtml(s.destination)}</span>
+                    </td>
+                    <td class="py-3 px-5">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${s.type === 'COD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${s.type}</span>
+                    </td>
+                    <td class="py-3 px-5 text-xs font-semibold text-slate-900">${s.type === 'COD' && s.value > 0 ? '₹' + (s.value || 0).toLocaleString('en-IN') : '-'}</td>
+                    <td class="py-3 px-5">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusClass}">${escapeHtml(s.status)}</span>
+                        ${s.isRto ? '<span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-100 text-rose-700">RTO</span>' : ''}
+                    </td>
+                    <td class="py-3 px-5 text-xs text-slate-500">${escapeHtml(s.lastUpdate) || 'N/A'}</td>
+                    <td class="py-3 px-5">
+                        <button onclick="event.stopPropagation(); viewShipment('${escapeHtml(s.awb)}')" class="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded" title="View Details">
+                            <iconify-icon icon="solar:eye-linear" width="16"></iconify-icon>
+                        </button>
+                        <button onclick="event.stopPropagation(); refreshSingle('${escapeHtml(s.awb)}')" class="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded" title="Refresh">
+                            <iconify-icon icon="solar:refresh-linear" width="16"></iconify-icon>
+                        </button>
+                        ${s.delPod ? `<a href="${escapeHtml(s.delPod)}" target="_blank" onclick="event.stopPropagation()" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="View POD"><iconify-icon icon="solar:gallery-check-linear" width="16"></iconify-icon></a>` : ''}
+                    </td>
+                </tr>
+            `}).join('');
 
-            trendLabels.innerHTML = days.map((d) => {
-                const label = d.toLocaleDateString('en-IN', { weekday: 'short' });
-                return `<div class="text-center">${label}</div>`;
-            }).join('');
+            // Update footer
+            footer.classList.remove('hidden');
+            document.getElementById('tableStatus').textContent = `Showing ${start + 1}-${Math.min(end, data.length)} of ${data.length} shipments`;
+            document.getElementById('pageInfo').textContent = `Page ${State.currentPage} of ${totalPages}`;
+            document.getElementById('prevBtn').disabled = State.currentPage === 1;
+            document.getElementById('nextBtn').disabled = State.currentPage === totalPages;
 
-            // ---- COD vs PPD ----
-            const codRows = rows.filter(r => (Number(r.collectable_value) || 0) > 0);
-            const prepaidRows = rows.filter(r => (Number(r.collectable_value) || 0) <= 0);
-            const codPct = total ? (codRows.length / total) * 100 : 0;
-            const prepaidPct = total ? (prepaidRows.length / total) * 100 : 0;
-            codBar.style.width = `${codPct.toFixed(0)}%`;
-            prepaidBar.style.width = `${prepaidPct.toFixed(0)}%`;
-            if (codCountEl) codCountEl.textContent = String(codRows.length);
-            if (prepaidCountEl) prepaidCountEl.textContent = String(prepaidRows.length);
-
-            const todayDelivered = rows.filter(r => deliveredCodes.includes(r.statusCode || ''));
-            const codCollected = todayDelivered.reduce((acc, r) => acc + (Number(r.collectable_value) || 0), 0);
-            if (codCollectedInline) codCollectedInline.textContent = formatCurrency(codCollected);
+            subtitle.textContent = `${data.length} shipment${data.length !== 1 ? 's' : ''} tracked`;
         }
 
-        function attachHandlers() {
-            if (pickupDateFilter) {
-                pickupDateFilter.addEventListener('change', () => {
-                    dashboardFilters.pickupDateKey = pickupDateFilter.value || '';
-                    renderDashboardFromRows(currentRows, (searchInput?.value || '').trim());
-                });
-            }
-            if (shipmentTypeFilter) {
-                shipmentTypeFilter.addEventListener('change', () => {
-                    const v = String(shipmentTypeFilter.value || 'ALL').toUpperCase();
-                    dashboardFilters.shipmentType = (v === 'COD' || v === 'PPD') ? /** @type {'COD'|'PPD'} */ (v) : 'ALL';
-                    renderDashboardFromRows(currentRows, (searchInput?.value || '').trim());
-                });
-            }
+        function getRowClass(statusCode) {
+            const classes = {
+                'DELIVERED': 'row-delivered',
+                'INTRANSIT': 'row-intransit',
+                'OFD': 'row-ofd',
+                'RTO': 'row-exception',
+                'NDR': 'row-exception',
+                'CANCELLED': '',
+            };
+            return classes[statusCode] || '';
+        }
 
-            // Search only triggers on button click or Enter key
-            function triggerSearch() {
-                fetchShipments(searchInput?.value || '');
-            }
+        function getStatusClass(statusCode) {
+            const classes = {
+                'DELIVERED': 'status-delivered',
+                'INTRANSIT': 'status-intransit',
+                'OFD': 'status-ofd',
+                'RTO': 'status-rto',
+                'NDR': 'status-ndr',
+                'CANCELLED': 'status-cancelled',
+            };
+            return classes[statusCode] || 'bg-slate-100 text-slate-600';
+        }
 
-            if (searchButton) {
-                searchButton.addEventListener('click', triggerSearch);
+        // =====================================================
+        // PAGINATION
+        // =====================================================
+        function prevPage() {
+            if (State.currentPage > 1) {
+                State.currentPage--;
+                renderTable();
             }
+        }
 
-            if (searchInput) {
-                searchInput.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        triggerSearch();
+        function nextPage() {
+            const totalPages = Math.ceil(State.filteredShipments.length / State.pageSize);
+            if (State.currentPage < totalPages) {
+                State.currentPage++;
+                renderTable();
+            }
+        }
+
+        // =====================================================
+        // ACTIONS
+        // =====================================================
+        function viewShipment(awb) {
+            window.location.href = `shipment.html?awb=${encodeURIComponent(awb)}`;
+        }
+
+        async function refreshSingle(awb) {
+            setLoading(true, `Refreshing AWB: ${awb}`);
+            try {
+                const data = await API.tracking.getByAwb(awb);
+                if (data) {
+                    const shipment = normalizeShipmentData(data);
+                    const index = State.shipments.findIndex(s => s.awb === awb);
+                    if (index >= 0) {
+                        State.shipments[index] = shipment;
                     }
-                });
-            }
-
-            if (clearButton) {
-                clearButton.addEventListener('click', () => {
-                    // Reset search input
-                    if (searchInput) searchInput.value = '';
-                    // Reset filters to defaults (all dates, all types)
-                    dashboardFilters.pickupDateKey = '';
-                    dashboardFilters.shipmentType = 'ALL';
-                    if (pickupDateFilter) pickupDateFilter.value = '';
-                    if (shipmentTypeFilter) shipmentTypeFilter.value = 'ALL';
-                    // Re-fetch with cleared state
-                    fetchShipments('');
-                    if (searchInput) searchInput.focus();
-                });
-            }
-
-            if (tbody) {
-                tbody.addEventListener('click', (event) => {
-                    const target = /** @type {HTMLElement | null} */ (event.target instanceof HTMLElement ? event.target.closest('[data-awb-link]') : null);
-                    if (target && target.dataset.awbLink) {
-                        openShipmentDetail(target.dataset.awbLink);
-                    }
-                });
+                    // Persist updated data
+                    DataLayer.saveCache(State.shipments);
+                    
+                    applyFiltersAndRender();
+                    showToast(`AWB ${awb} refreshed`, 'success');
+                }
+            } catch (error) {
+                handleApiError(error, awb);
+            } finally {
+                setLoading(false);
+                updateRateLimitStatus();
             }
         }
 
-        /**
-         * @param {string} awb
-         */
-        function openShipmentDetail(awb) {
-            const detailPath = `shipment.html?awb=${encodeURIComponent(awb)}`;
-            window.location.assign(detailPath);
+        function refreshResults() {
+            if (State.trackedAwbs.size === 0) {
+                showToast('No AWBs to refresh', 'info');
+                return;
+            }
+            
+            const awbs = Array.from(State.trackedAwbs);
+            document.getElementById('bulkAwbInput').value = awbs.join(', ');
+            trackBulkAWB();
         }
 
-        const currentDateEl = document.getElementById('currentDate');
-        if (currentDateEl) {
-            currentDateEl.textContent = new Date().toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+        // =====================================================
+        // EXPORT
+        // =====================================================
+        function exportData() {
+            if (State.filteredShipments.length === 0) {
+                showToast('No data to export', 'error');
+                return;
+            }
+
+            const headers = ['AWB', 'Order Number', 'Customer', 'Origin', 'Destination', 'Current Location', 'Type', 'Value', 'Status', 'Last Update', 'Added On', 'Weight', 'Is RTO'];
+            const rows = State.filteredShipments.map(s => [
+                s.awb, s.orderNumber, s.customer, s.origin, s.destination, s.currentLocation, s.type, s.value, s.status, s.lastUpdate, s.addedOn, s.weight, s.isRto
+            ]);
+            
+            const csv = [headers, ...rows]
+                .map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','))
+                .join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `urbanebolt-shipments-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showToast(`Exported ${State.filteredShipments.length} records`, 'success');
         }
 
-        // Default: show ALL shipments (no date filter). User can select a date to filter.
-        dashboardFilters.pickupDateKey = '';
-        dashboardFilters.shipmentType = 'ALL';
-        if (pickupDateFilter) pickupDateFilter.value = '';
-        if (shipmentTypeFilter) shipmentTypeFilter.value = 'ALL';
-
-        // Public mode: load dashboard without authentication.
-        attachHandlers();
-        fetchShipments('');
+        // =====================================================
+        // UTILITIES
+        // =====================================================
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
     </script>
 </body>
 </html>
