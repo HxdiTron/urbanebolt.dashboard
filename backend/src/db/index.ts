@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { CONFIG } from '../config';
 import { logger } from '../utils/logger';
 
@@ -20,7 +20,7 @@ pool.on('error', (err) => {
 });
 
 // Query helper with logging
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
     text: string,
     params?: any[]
 ): Promise<QueryResult<T>> {

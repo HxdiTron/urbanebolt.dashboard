@@ -19,6 +19,8 @@ const API = (() => {
     // =========================================================
     // CONFIGURATION
     // =========================================================
+    const DEBUG = false;  // Set to true for development debugging
+    
     const CONFIG = {
         baseUrl: '',
         maxConcurrent: 18,          // HARD LIMIT: Max concurrent requests
@@ -52,10 +54,21 @@ const API = (() => {
         if (options.maxBatchSize) {
             CONFIG.maxConcurrent = Math.min(options.maxBatchSize, 20); // Never exceed 20
         }
-        console.log('[API] Configured:', {
+        if (DEBUG) console.log('[API] Configured:', {
             baseUrl: CONFIG.baseUrl ? 'SET' : 'NOT SET',
             maxConcurrent: CONFIG.maxConcurrent,
         });
+    }
+
+    // =========================================================
+    // PUBLIC: GET CONFIG (for checking if configured)
+    // =========================================================
+    function getConfig() {
+        return {
+            baseUrl: CONFIG.baseUrl,
+            maxConcurrent: CONFIG.maxConcurrent,
+            isConfigured: !!CONFIG.baseUrl,
+        };
     }
 
     // =========================================================
@@ -99,11 +112,11 @@ const API = (() => {
         consecutiveFailures++;
         if (consecutiveFailures >= CIRCUIT_THRESHOLD) {
             circuitOpen = true;
-            console.warn('[API] Circuit breaker OPEN - too many consecutive failures');
+            if (DEBUG) console.warn('[API] Circuit breaker OPEN');
             setTimeout(() => {
                 circuitOpen = false;
                 consecutiveFailures = 0;
-                console.log('[API] Circuit breaker RESET');
+                if (DEBUG) console.log('[API] Circuit breaker RESET');
             }, CIRCUIT_RESET_MS);
         }
     }
@@ -173,7 +186,7 @@ const API = (() => {
             if (attempt < CONFIG.retryAttempts && !error.status) {
                 // Only retry network errors, not HTTP errors
                 const delay = CONFIG.retryDelayMs * Math.pow(2, attempt - 1);
-                console.log(`[API] Retry ${attempt}/${CONFIG.retryAttempts} in ${delay}ms:`, endpoint);
+                if (DEBUG) console.log(`[API] Retry ${attempt}/${CONFIG.retryAttempts} in ${delay}ms`);
                 await sleep(delay);
                 return requestWithRetry(endpoint, options, attempt + 1);
             }
@@ -196,7 +209,7 @@ const API = (() => {
             // Check rate limit
             const rateLimit = checkRateLimit();
             if (!rateLimit.allowed) {
-                console.warn(`[API] Rate limited. Wait ${rateLimit.waitMs}ms`);
+                if (DEBUG) console.warn(`[API] Rate limited. Wait ${rateLimit.waitMs}ms`);
             }
 
             // Add to queue
@@ -439,6 +452,7 @@ const API = (() => {
     // =========================================================
     return Object.freeze({
         configure,
+        getConfig,
         tracking,
         request: deduplicatedRequest,
         batchFetch,

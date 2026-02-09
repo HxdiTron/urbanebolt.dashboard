@@ -463,9 +463,38 @@
         };
 
         // =====================================================
+        // API CONFIGURATION FALLBACK
+        // =====================================================
+        // Ensure API is configured (fallback in case config.js is missing)
+        (function ensureApiConfigured() {
+            if (typeof API !== 'undefined' && API.getConfig) {
+                const config = API.getConfig();
+                if (!config.baseUrl) {
+                    console.warn('[Fallback] API not configured, applying default config');
+                    API.configure({
+                        baseUrl: 'https://api.urbanebolt.in',
+                        maxBatchSize: 20,
+                    });
+                }
+            }
+        })();
+
+        // =====================================================
         // INITIALIZATION
         // =====================================================
         document.addEventListener('DOMContentLoaded', () => {
+            // Ensure API is configured (check again after DOMContentLoaded)
+            if (typeof API !== 'undefined' && API.getConfig) {
+                const config = API.getConfig();
+                if (!config.baseUrl) {
+                    console.warn('[Init] API not configured, applying default config');
+                    API.configure({
+                        baseUrl: 'https://api.urbanebolt.in',
+                        maxBatchSize: 20,
+                    });
+                }
+            }
+
             // Set current date
             document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-IN', { 
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 

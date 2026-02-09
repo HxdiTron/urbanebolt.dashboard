@@ -117,13 +117,27 @@
     </main>
 
     <script>
+        // Ensure API is configured (fallback in case config.js is missing)
+        (function ensureApiConfigured() {
+            if (typeof API !== 'undefined' && API.getConfig) {
+                const config = API.getConfig();
+                if (!config.baseUrl) {
+                    console.warn('[Fallback] API not configured, applying default config');
+                    API.configure({
+                        baseUrl: 'https://api.urbanebolt.in',
+                        maxBatchSize: 20,
+                    });
+                }
+            }
+        })();
+
         // Check for AWB in URL
         const params = new URLSearchParams(window.location.search);
         const awbFromUrl = params.get('awb');
         if (awbFromUrl) {
             document.getElementById('awbInput').value = awbFromUrl;
-            // Wait for API to be configured
-            setTimeout(loadShipment, 100);
+            // Wait for API to be configured, then load
+            setTimeout(loadShipment, 200);
         }
 
         function escapeHtml(text) {

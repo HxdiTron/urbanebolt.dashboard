@@ -74,7 +74,11 @@ async function fetchTracking(awb: string): Promise<any> {
             throw new Error(`API returned ${response.status}: ${response.statusText}`);
         }
         
-        const data = await response.json();
+        const data = await response.json() as {
+            status: string;
+            data?: any[];
+            error?: string;
+        };
         
         if (data.status !== 'Success' || !data.data?.[0]) {
             throw new Error(data.error || 'Invalid API response - no data');
