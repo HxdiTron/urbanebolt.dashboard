@@ -34,6 +34,62 @@
         .row-intransit { border-left: 3px solid #3b82f6; }
         .row-ofd { border-left: 3px solid #f59e0b; }
         .row-exception { border-left: 3px solid #ef4444; }
+        
+        /* Filter Chips */
+        .status-chip {
+            background-color: #f1f5f9;
+            color: #64748b;
+            border: 1px solid transparent;
+        }
+        .status-chip:hover {
+            background-color: #e2e8f0;
+            color: #475569;
+        }
+        .status-chip.active {
+            background-color: #1e293b;
+            color: white;
+            border-color: #1e293b;
+        }
+        .status-chip.failure-chip:hover {
+            background-color: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+        .status-chip.failure-chip.active {
+            background-color: #dc2626;
+            border-color: #dc2626;
+            color: white;
+        }
+        
+        /* Delay indicator styles */
+        .delay-positive { color: #059669; background-color: #d1fae5; }
+        .delay-negative { color: #dc2626; background-color: #fee2e2; font-weight: 600; }
+        .delay-neutral { color: #64748b; background-color: #f1f5f9; }
+        
+        /* SLA Badge styles */
+        .sla-ontime { background-color: #d1fae5; color: #047857; }
+        .sla-delayed { background-color: #fee2e2; color: #dc2626; }
+        .sla-breach { background-color: #fef3c7; color: #b45309; }
+        .sla-critical { background: linear-gradient(135deg, #fee2e2, #fef3c7); color: #dc2626; animation: pulse 2s infinite; }
+        
+        /* Row highlight for failures */
+        .row-failure { 
+            background-color: #fef2f2 !important; 
+            border-left: 3px solid #dc2626;
+        }
+        .row-breach {
+            background-color: #fffbeb !important;
+            border-left: 3px solid #f59e0b;
+        }
+        
+        /* Select dropdown styling */
+        select {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
     </style>
 </head>
 <body class="text-slate-600 antialiased h-screen flex overflow-hidden">
@@ -61,16 +117,6 @@
                     Overview
                 </a>
                 
-                <a href="manifest.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
-                    <iconify-icon icon="solar:clipboard-list-linear" width="18"></iconify-icon>
-                    Master Manifest
-                </a>
-
-                <a href="riders.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
-                    <iconify-icon icon="solar:user-hand-up-linear" width="18"></iconify-icon>
-                    Rider Allocation
-                </a>
-
                 <div class="px-3 pb-2 pt-5">
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Finance & NDR</p>
                 </div>
@@ -122,84 +168,138 @@
                 </div>
             </div>
             
-            <!-- SEARCH BAR - PROMINENT -->
-            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <!-- SEARCH & TRACK SECTION -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div class="flex flex-col lg:flex-row gap-4">
                     <!-- AWB Search -->
                     <div class="flex-1">
-                        <label class="block text-xs font-semibold text-slate-700 mb-2">
-                            <iconify-icon icon="solar:magnifer-linear" width="14" class="mr-1"></iconify-icon>
-                            Track Shipment by AWB
-                        </label>
                         <div class="flex gap-2">
-                            <input type="text" id="awbSearchInput" 
-                                placeholder="Enter AWB number (e.g., 200000077431)" 
-                                class="flex-1 text-sm bg-white border border-slate-300 rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <div class="relative flex-1">
+                                <iconify-icon icon="solar:magnifer-linear" width="18" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
+                                <input type="text" id="awbSearchInput" 
+                                    placeholder="Track shipment by AWB number..." 
+                                    class="w-full text-sm bg-slate-50 border-0 rounded-xl pl-11 pr-4 py-3 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all">
+                            </div>
                             <button onclick="trackSingleAWB()" id="trackBtn"
-                                class="px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2 whitespace-nowrap">
+                                class="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl hover:from-blue-700 hover:to-blue-800 flex items-center gap-2 whitespace-nowrap shadow-sm shadow-blue-200 transition-all">
                                 <iconify-icon icon="solar:magnifer-linear" width="16"></iconify-icon>
-                                Track AWB
-                    </button>
-                </div>
-            </div>
+                                Track
+                            </button>
+                        </div>
+                    </div>
 
                     <!-- Bulk Search -->
-                    <div class="lg:w-80">
-                        <label class="block text-xs font-semibold text-slate-700 mb-2">
-                            <iconify-icon icon="solar:layers-linear" width="14" class="mr-1"></iconify-icon>
-                            Bulk Track (Multiple AWBs)
-                        </label>
+                    <div class="lg:w-96">
                         <div class="flex gap-2">
-                            <input type="text" id="bulkAwbInput" 
-                                placeholder="AWB1, AWB2, AWB3..." 
-                                class="flex-1 text-sm bg-white border border-slate-300 rounded-lg px-4 py-2.5 font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                            <div class="relative flex-1">
+                                <iconify-icon icon="solar:layers-linear" width="18" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
+                                <input type="text" id="bulkAwbInput" 
+                                    placeholder="Bulk track: AWB1, AWB2, AWB3..." 
+                                    class="w-full text-sm bg-slate-50 border-0 rounded-xl pl-11 pr-4 py-3 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all">
+                            </div>
                             <button onclick="trackBulkAWB()" id="bulkTrackBtn"
-                                class="px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                class="px-5 py-3 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 flex items-center gap-2 transition-all">
                                 <iconify-icon icon="solar:upload-linear" width="16"></iconify-icon>
                                 Bulk
                             </button>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-1">Max 20 AWBs per request • Comma separated</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- FILTERS SECTION -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mt-4">
+                <!-- Quick Status Filters (Chips) -->
+                <div class="flex flex-wrap items-center gap-2 mb-4">
+                    <span class="text-xs font-medium text-slate-500 mr-2">Quick filters:</span>
+                    <button onclick="setStatusFilter('ALL')" data-status="ALL" class="status-chip active px-3 py-1.5 text-xs font-medium rounded-full transition-all">
+                        All
+                    </button>
+                    <button onclick="setStatusFilter('FAILURE')" data-status="FAILURE" class="status-chip failure-chip px-3 py-1.5 text-xs font-medium rounded-full transition-all border border-transparent">
+                        <span class="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1.5 animate-pulse"></span>
+                        Failures
+                        <span id="failureChipCount" class="ml-1 text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full hidden">0</span>
+                    </button>
+                    <button onclick="setStatusFilter('DELAYED')" data-status="DELAYED" class="status-chip px-3 py-1.5 text-xs font-medium rounded-full transition-all">
+                        <span class="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5"></span>
+                        Delayed
+                    </button>
+                    <button onclick="setStatusFilter('DELIVERED')" data-status="DELIVERED" class="status-chip px-3 py-1.5 text-xs font-medium rounded-full transition-all">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+                        Delivered
+                    </button>
+                    <button onclick="setStatusFilter('INTRANSIT')" data-status="INTRANSIT" class="status-chip px-3 py-1.5 text-xs font-medium rounded-full transition-all">
+                        <span class="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5"></span>
+                        In Transit
+                    </button>
+                    <button onclick="setStatusFilter('OFD')" data-status="OFD" class="status-chip px-3 py-1.5 text-xs font-medium rounded-full transition-all">
+                        <span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
+                        OFD
+                    </button>
+                    <button onclick="setStatusFilter('RTO')" data-status="RTO" class="status-chip px-3 py-1.5 text-xs font-medium rounded-full transition-all">
+                        <span class="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span>
+                        RTO
+                    </button>
                 </div>
 
-                <!-- Filters Row -->
-                <div class="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-slate-200">
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Date Filter</label>
-                        <input type="date" id="dateFilter" class="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2">
+                <!-- Advanced Filters Row -->
+                <div class="flex flex-wrap items-end gap-3 pt-3 border-t border-slate-100">
+                    <!-- Search in Table -->
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Search in results</label>
+                        <div class="relative">
+                            <iconify-icon icon="solar:magnifer-linear" width="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
+                            <input type="text" id="tableSearchInput" 
+                                placeholder="AWB, customer, location..." 
+                                oninput="applyFiltersAndRender()"
+                                class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all">
                         </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Shipment Type</label>
-                        <select id="typeFilter" class="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 min-w-[120px]">
+                    </div>
+
+                    <!-- Type Filter -->
+                    <div class="min-w-[130px]">
+                        <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Type</label>
+                        <select id="typeFilter" onchange="applyFiltersAndRender()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none appearance-none cursor-pointer transition-all">
                             <option value="ALL">All Types</option>
-                            <option value="COD">COD Only</option>
-                            <option value="PPD">Prepaid Only</option>
+                            <option value="COD">COD</option>
+                            <option value="PPD">Prepaid</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Status</label>
-                        <select id="statusFilter" class="text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 min-w-[140px]">
-                            <option value="ALL">All Statuses</option>
-                            <option value="DELIVERED">Delivered</option>
-                            <option value="INTRANSIT">In Transit</option>
-                            <option value="OFD">Out for Delivery</option>
-                            <option value="RTO">RTO</option>
-                            <option value="NDR">NDR</option>
-                            <option value="CANCELLED">Cancelled</option>
+
+                    <!-- Origin Filter -->
+                    <div class="min-w-[140px]">
+                        <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Origin</label>
+                        <select id="originFilter" onchange="applyFiltersAndRender()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none appearance-none cursor-pointer transition-all">
+                            <option value="ALL">All Origins</option>
                         </select>
                     </div>
-                    <div class="flex items-end gap-2 ml-auto">
-                        <button onclick="clearFilters()" class="px-3 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">
-                            Clear Filters
+
+                    <!-- Destination Filter -->
+                    <div class="min-w-[140px]">
+                        <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Destination</label>
+                        <select id="destinationFilter" onchange="applyFiltersAndRender()" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none appearance-none cursor-pointer transition-all">
+                            <option value="ALL">All Destinations</option>
+                        </select>
+                    </div>
+
+                    <!-- Status Filter (Hidden - controlled by chips) -->
+                    <input type="hidden" id="statusFilter" value="ALL">
+                    <input type="hidden" id="dateFilter" value="">
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-2 ml-auto">
+                        <span id="activeFilterCount" class="hidden text-xs text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded-full"></span>
+                        <button onclick="clearFilters()" class="px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all flex items-center gap-1.5">
+                            <iconify-icon icon="solar:restart-linear" width="14"></iconify-icon>
+                            Reset
                         </button>
-                        <button onclick="applyFilters()" class="px-4 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 flex items-center gap-2">
-                            <iconify-icon icon="solar:filter-linear" width="14"></iconify-icon>
-                            Apply Filters
+                        <button onclick="exportData()" class="px-3 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all flex items-center gap-1.5">
+                            <iconify-icon icon="solar:export-linear" width="14"></iconify-icon>
+                            Export
                         </button>
+                    </div>
                 </div>
-                        </div>
-                    </div>
+            </div>
         </header>
 
         <!-- Scrollable Dashboard Area -->
@@ -252,42 +352,88 @@
                 </div>
             </div>
 
-            <!-- Secondary KPIs -->
-            <div class="grid grid-cols-3 gap-4">
-                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+            <!-- SLA & Lifecycle KPIs -->
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-white rounded-xl p-4 premium-border premium-shadow">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                            <iconify-icon icon="solar:chart-2-linear" width="20"></iconify-icon>
+                            <iconify-icon icon="solar:chart-2-linear" width="18"></iconify-icon>
                         </div>
                         <div>
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase">Success Rate</p>
-                            <h3 id="kpi-dsr" class="text-xl font-bold text-slate-900">0%</h3>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase">On-Time Rate</p>
+                            <h3 id="kpi-dsr" class="text-lg font-bold text-slate-900">0%</h3>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                <div class="bg-white rounded-xl p-4 premium-border premium-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-rose-50 text-rose-600 rounded-lg">
+                            <iconify-icon icon="solar:clock-circle-linear" width="18"></iconify-icon>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase">Delayed</p>
+                            <h3 id="kpi-delayed" class="text-lg font-bold text-rose-600">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl p-4 premium-border premium-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-orange-50 text-orange-600 rounded-lg">
+                            <iconify-icon icon="solar:danger-triangle-linear" width="18"></iconify-icon>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase">Lifecycle Breach</p>
+                            <h3 id="kpi-breach" class="text-lg font-bold text-orange-600">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl p-4 premium-border premium-shadow">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                            <iconify-icon icon="solar:wallet-linear" width="20"></iconify-icon>
+                            <iconify-icon icon="solar:wallet-linear" width="18"></iconify-icon>
                         </div>
                         <div>
                             <p class="text-[10px] font-semibold text-slate-400 uppercase">COD Value</p>
-                            <h3 id="kpi-cod" class="text-xl font-bold text-slate-900">₹0</h3>
+                            <h3 id="kpi-cod" class="text-lg font-bold text-slate-900">₹0</h3>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
+                <div class="bg-white rounded-xl p-4 premium-border premium-shadow">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-violet-50 text-violet-600 rounded-lg">
-                            <iconify-icon icon="solar:clock-circle-linear" width="20"></iconify-icon>
+                            <iconify-icon icon="solar:hourglass-linear" width="18"></iconify-icon>
                         </div>
                         <div>
-                            <p class="text-[10px] font-semibold text-slate-400 uppercase">Avg TAT</p>
-                            <h3 id="kpi-tat" class="text-xl font-bold text-slate-900">-- hrs</h3>
-                            </div>
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase">Avg Delay</p>
+                            <h3 id="kpi-avgdelay" class="text-lg font-bold text-slate-900">-- days</h3>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Failure Bucket Alert (shown when there are failures) -->
+            <div id="failureBucketAlert" class="hidden bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-200 rounded-xl p-4">
+                <div class="flex items-start gap-4">
+                    <div class="p-2 bg-rose-100 text-rose-600 rounded-lg">
+                        <iconify-icon icon="solar:shield-warning-linear" width="24"></iconify-icon>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-sm font-bold text-rose-900">Failure Bucket Alert</h3>
+                        <p class="text-xs text-rose-700 mt-1">
+                            <span id="failureBucketCount">0</span> shipments require attention:
+                            <span id="failureBucketDetails" class="font-medium"></span>
+                        </p>
+                        <button onclick="setStatusFilter('FAILURE')" class="mt-2 px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition-all">
+                            View Failure Bucket
+                        </button>
+                    </div>
+                    <button onclick="dismissFailureAlert()" class="text-rose-400 hover:text-rose-600">
+                        <iconify-icon icon="solar:close-circle-linear" width="20"></iconify-icon>
+                    </button>
                 </div>
             </div>
 
@@ -318,14 +464,20 @@
                     <table class="w-full text-left">
                         <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">AWB Number</th>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Route</th>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Value</th>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Last Update</th>
-                                <th class="py-3 px-5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">AWB Number</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Route</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">EDD</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    <span class="flex items-center gap-1">
+                                        Delay
+                                        <iconify-icon icon="solar:info-circle-linear" width="12" class="text-slate-400" title="Days past EDD (negative = late)"></iconify-icon>
+                                    </span>
+                                </th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">SLA</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Last Update</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="resultsTable" class="divide-y divide-slate-100 text-sm">
@@ -558,13 +710,16 @@
                 // Sort by most recent first
                 sortShipmentsByDate();
                 
+                // Update filter dropdowns with available options
+                updateFilterDropdowns();
+                
                 applyFiltersAndRender();
                 updateLastSyncDisplay();
                 
                 const lastSync = DataLayer.getLastSync();
                 if (lastSync > 0) {
                     const ago = formatTimeAgo(lastSync);
-                    showToast(`Loaded ${cachedShipments.length} shipments (last updated ${ago})`, 'info');
+                    showToast(`Loaded ${cachedShipments.length} shipments`, 'info');
                 }
             }
         }
@@ -662,11 +817,12 @@
                 DataLayer.saveCache(State.shipments);
                 DataLayer.updateLastSync();
 
+                // Update filter dropdowns with new data
+                updateFilterDropdowns();
                 applyFiltersAndRender();
                 updateRateLimitStatus();
 
-                console.log(`[AutoSync] Complete: ${successCount} updated, ${failCount} failed`);
-                showToast(`Auto-refresh complete: ${successCount} shipments updated`, 'success');
+                showToast(`Synced ${successCount} shipments`, 'success');
                 updateLastSyncDisplay();
 
             } catch (error) {
@@ -830,9 +986,10 @@
                     DataLayer.saveCache(State.shipments);
                     DataLayer.updateLastSync();
                     
+                    updateFilterDropdowns();
                     applyFiltersAndRender();
                     updateLastSyncDisplay();
-                    showToast(`AWB ${awb} tracked successfully`, 'success');
+                    showToast(`AWB ${awb} tracked`, 'success');
                     input.value = '';
                 } else {
                     showToast(`No shipment found for AWB: ${awb}`, 'error');
@@ -927,13 +1084,14 @@
                 DataLayer.saveCache(State.shipments);
                 DataLayer.updateLastSync();
 
+                updateFilterDropdowns();
                 applyFiltersAndRender();
                 updateLastSyncDisplay();
                 
                 if (failCount > 0) {
                     showToast(`${successCount} tracked, ${failCount} failed`, 'info');
                 } else {
-                    showToast(`${successCount} AWBs tracked successfully`, 'success');
+                    showToast(`${successCount} AWBs tracked`, 'success');
                 }
                 
                 input.value = '';
@@ -965,6 +1123,12 @@
             // Determine invoice/value from invoiceNumber or use 0 for PPD
             const invoiceValue = parseFloat(apiData.invoiceNumber || 0) || 0;
             
+            // Get normalized status code
+            const statusCode = normalizeStatusCode(apiData.currentStatusCode);
+            
+            // Calculate lifecycle metrics
+            const lifecycle = calculateLifecycleMetrics(apiData, statusCode);
+            
             return {
                 awb: String(apiData.awbNumber || ''),
                 orderNumber: apiData.orderNumber || '',
@@ -975,11 +1139,12 @@
                 currentLocation: apiData.currentLocation || apiData.destination || '',
                 value: apiData.productType === 'COD' ? invoiceValue : 0,
                 status: apiData.currentStatusCodeDescription || apiData.currentStatusCode || 'Unknown',
-                statusCode: normalizeStatusCode(apiData.currentStatusCode),
+                statusCode: statusCode,
                 type: apiData.productType || 'PPD',
                 lastUpdate: apiData.currentStatusDateTime || '',
                 addedOn: apiData.addedOn || '',
                 edd: apiData.edd || '',
+                eddDate: lifecycle.eddDate,
                 weight: apiData.weight || 0,
                 pieces: apiData.pieces || 1,
                 isRto: apiData.isRto || false,
@@ -989,38 +1154,156 @@
                 reasonDescription: apiData.currentReasonCodeDescription || '',
                 scans: apiData.scans || [],
                 rawData: apiData,
+                
+                // Lifecycle & SLA fields
+                createdAt: lifecycle.createdAt,
+                deliveredAt: lifecycle.deliveredAt,
+                shipmentAgeDays: lifecycle.shipmentAgeDays,
+                delayedDays: lifecycle.delayedDays,
+                isTerminal: lifecycle.isTerminal,
+                lifecycleBreach: lifecycle.lifecycleBreach,
+                isDelayed: lifecycle.isDelayed,
+                isInFailureBucket: lifecycle.isInFailureBucket,
+                failureReasons: lifecycle.failureReasons,
+                slaStatus: lifecycle.slaStatus,
             };
         }
 
         /**
+         * Calculate lifecycle metrics for a shipment
+         * Rules:
+         * 1. Terminal statuses: DELIVERED, RTO, CANCELLED, LOST
+         * 2. Lifecycle breach: >15 days and not terminal
+         * 3. Delay = deliveredDate - EDD (if delivered) or today - EDD (if not)
+         * 4. Failure bucket: delayed OR lifecycle breach OR invalid transition
+         */
+        function calculateLifecycleMetrics(apiData, statusCode) {
+            const LIFECYCLE_LIMIT_DAYS = 15;
+            const TERMINAL_STATUSES = ['DELIVERED', 'RTO', 'CANCELLED', 'LOST'];
+            
+            // Get today's date at midnight (timezone-safe)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Parse created date (addedOn format: "06 Jul 2025")
+            const createdAt = parseApiDate(apiData.addedOn);
+            
+            // Parse EDD (format: "2025-07-07" or "07 Jul 2025")
+            const eddDate = parseApiDate(apiData.edd);
+            
+            // Parse delivery date from scans (find DDL scan)
+            let deliveredAt = null;
+            if (statusCode === 'DELIVERED' && apiData.scans && apiData.scans.length > 0) {
+                const deliveryScan = apiData.scans.find(s => s.statusCode === 'DDL');
+                if (deliveryScan) {
+                    deliveredAt = parseApiDate(deliveryScan.statusDateTime);
+                }
+            }
+            
+            // Calculate shipment age in days
+            let shipmentAgeDays = 0;
+            if (createdAt) {
+                shipmentAgeDays = Math.floor((today - createdAt) / (1000 * 60 * 60 * 24));
+            }
+            
+            // Check if terminal status
+            const isTerminal = TERMINAL_STATUSES.includes(statusCode);
+            
+            // Check lifecycle breach (>15 days and not terminal)
+            const lifecycleBreach = shipmentAgeDays > LIFECYCLE_LIMIT_DAYS && !isTerminal;
+            
+            // Calculate delayed days
+            // Negative = late, Positive = early, 0 = on time
+            let delayedDays = null;
+            if (eddDate) {
+                if (deliveredAt) {
+                    delayedDays = Math.floor((eddDate - deliveredAt) / (1000 * 60 * 60 * 24));
+                } else if (!isTerminal) {
+                    delayedDays = Math.floor((eddDate - today) / (1000 * 60 * 60 * 24));
+                } else if (statusCode === 'RTO' || statusCode === 'CANCELLED') {
+                    delayedDays = Math.floor((eddDate - today) / (1000 * 60 * 60 * 24));
+                }
+            }
+            
+            // Is delayed? (negative delayed days means late)
+            const isDelayed = delayedDays !== null && delayedDays < 0;
+            
+            // Determine failure reasons
+            const failureReasons = [];
+            if (isDelayed) failureReasons.push('Delayed');
+            if (lifecycleBreach) failureReasons.push('Lifecycle Breach');
+            if (statusCode === 'RTO') failureReasons.push('RTO');
+            if (statusCode === 'CANCELLED') failureReasons.push('Cancelled');
+            if (statusCode === 'NDR') failureReasons.push('NDR');
+            
+            // Is in failure bucket?
+            const isInFailureBucket = failureReasons.length > 0;
+            
+            // Determine SLA status
+            let slaStatus = 'PENDING';
+            if (statusCode === 'DELIVERED') {
+                slaStatus = isDelayed ? 'DELAYED' : 'ONTIME';
+            } else if (lifecycleBreach) {
+                slaStatus = 'BREACH';
+            } else if (isDelayed) {
+                slaStatus = 'DELAYED';
+            } else if (!isTerminal) {
+                slaStatus = 'PENDING';
+            } else {
+                slaStatus = 'FAILED';
+            }
+            
+            return {
+                createdAt, deliveredAt, eddDate, shipmentAgeDays, delayedDays,
+                isTerminal, lifecycleBreach, isDelayed, isInFailureBucket, failureReasons, slaStatus,
+            };
+        }
+
+        /**
+         * Parse various date formats from API
+         */
+        function parseApiDate(dateStr) {
+            if (!dateStr) return null;
+            try {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    const date = new Date(year, month - 1, day);
+                    date.setHours(0, 0, 0, 0);
+                    return date;
+                }
+                const months = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+                const match = dateStr.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
+                if (match) {
+                    const [, day, monthStr, year] = match;
+                    const month = months[monthStr];
+                    if (month !== undefined) {
+                        const date = new Date(parseInt(year), month, parseInt(day));
+                        date.setHours(0, 0, 0, 0);
+                        return date;
+                    }
+                }
+                const parsed = new Date(dateStr);
+                if (!isNaN(parsed.getTime())) {
+                    parsed.setHours(0, 0, 0, 0);
+                    return parsed;
+                }
+                return null;
+            } catch (e) { return null; }
+        }
+
+        /**
          * Normalize status codes to internal categories
-         * Status Codes from API:
-         *   DDL = Delivered, OFD = Out for Delivery, MAN = Manifested,
-         *   PKD = Picked Up, IND = In-scanned, BGD = Bagged, DPD = Departed,
-         *   ARD = Arrived, RDC = Reached DC, DBG = De-bagged, DDS = Delivery Scheduled,
-         *   UDD = Un-delivered, RTO = Return to Origin, CAN = Cancelled
          */
         function normalizeStatusCode(code) {
             const c = (code || '').toUpperCase();
-            
-            // Delivered
             if (c === 'DDL') return 'DELIVERED';
-            
-            // Out for Delivery
             if (c === 'OFD' || c === 'DDS') return 'OFD';
-            
-            // In Transit (various stages)
             if (['MAN', 'PKD', 'IND', 'BGD', 'DPD', 'ARD', 'RDC', 'DBG'].includes(c)) return 'INTRANSIT';
-            
-            // RTO
             if (c === 'RTO' || c.startsWith('RTO')) return 'RTO';
-            
-            // Undelivered / NDR (Non-Delivery Report)
             if (c === 'UDD' || c === 'NDR') return 'NDR';
-            
-            // Cancelled
             if (c === 'CAN' || c === 'CANCELLED') return 'CANCELLED';
-            
+            if (c === 'LOST') return 'LOST';
             return 'OTHER';
         }
 
@@ -1029,37 +1312,199 @@
         // =====================================================
         function applyFilters() {
             applyFiltersAndRender();
-            showToast('Filters applied', 'info');
         }
 
         function clearFilters() {
             document.getElementById('dateFilter').value = '';
             document.getElementById('typeFilter').value = 'ALL';
             document.getElementById('statusFilter').value = 'ALL';
+            document.getElementById('originFilter').value = 'ALL';
+            document.getElementById('destinationFilter').value = 'ALL';
+            const tableSearch = document.getElementById('tableSearchInput');
+            if (tableSearch) tableSearch.value = '';
+            
+            // Reset status chips
+            setStatusFilter('ALL');
             applyFiltersAndRender();
-            showToast('Filters cleared', 'info');
+        }
+
+        function setStatusFilter(status) {
+            document.getElementById('statusFilter').value = status;
+            
+            // Update chip active states
+            document.querySelectorAll('.status-chip').forEach(chip => {
+                if (chip.dataset.status === status) {
+                    chip.classList.add('active');
+                } else {
+                    chip.classList.remove('active');
+                }
+            });
+            
+            applyFiltersAndRender();
+        }
+
+        function updateFilterDropdowns() {
+            // Get unique origins and destinations from current shipments
+            const origins = new Set();
+            const destinations = new Set();
+            
+            State.shipments.forEach(s => {
+                if (s.origin) origins.add(s.origin);
+                if (s.destination) destinations.add(s.destination);
+            });
+            
+            // Update origin dropdown
+            const originSelect = document.getElementById('originFilter');
+            const currentOrigin = originSelect.value;
+            originSelect.innerHTML = '<option value="ALL">All Origins</option>';
+            [...origins].sort().forEach(origin => {
+                originSelect.innerHTML += `<option value="${escapeHtml(origin)}">${escapeHtml(origin)}</option>`;
+            });
+            originSelect.value = currentOrigin || 'ALL';
+            
+            // Update destination dropdown
+            const destSelect = document.getElementById('destinationFilter');
+            const currentDest = destSelect.value;
+            destSelect.innerHTML = '<option value="ALL">All Destinations</option>';
+            [...destinations].sort().forEach(dest => {
+                destSelect.innerHTML += `<option value="${escapeHtml(dest)}">${escapeHtml(dest)}</option>`;
+            });
+            destSelect.value = currentDest || 'ALL';
+        }
+
+        function updateActiveFilterCount() {
+            let count = 0;
+            if (document.getElementById('statusFilter').value !== 'ALL') count++;
+            if (document.getElementById('typeFilter').value !== 'ALL') count++;
+            if (document.getElementById('originFilter').value !== 'ALL') count++;
+            if (document.getElementById('destinationFilter').value !== 'ALL') count++;
+            const tableSearch = document.getElementById('tableSearchInput');
+            if (tableSearch && tableSearch.value.trim()) count++;
+            
+            const badge = document.getElementById('activeFilterCount');
+            if (count > 0) {
+                badge.textContent = `${count} filter${count > 1 ? 's' : ''} active`;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
         }
 
         function applyFiltersAndRender() {
             const typeFilter = document.getElementById('typeFilter').value;
             const statusFilter = document.getElementById('statusFilter').value;
+            const originFilter = document.getElementById('originFilter').value;
+            const destinationFilter = document.getElementById('destinationFilter').value;
+            const tableSearch = document.getElementById('tableSearchInput');
+            const searchTerm = tableSearch ? tableSearch.value.toLowerCase().trim() : '';
 
             State.filteredShipments = State.shipments.filter(s => {
+                // Type filter
                 if (typeFilter !== 'ALL' && s.type !== typeFilter) return false;
-                if (statusFilter !== 'ALL' && s.statusCode !== statusFilter) return false;
+                
+                // Special status filters
+                if (statusFilter === 'FAILURE') {
+                    // Failure bucket: delayed OR lifecycle breach OR RTO/Cancelled/NDR
+                    if (!s.isInFailureBucket) return false;
+                } else if (statusFilter === 'DELAYED') {
+                    // Only delayed shipments (negative delay days)
+                    if (!s.isDelayed) return false;
+                } else if (statusFilter !== 'ALL') {
+                    // Normal status filter
+                    if (s.statusCode !== statusFilter) return false;
+                }
+                
+                // Origin filter
+                if (originFilter !== 'ALL' && s.origin !== originFilter) return false;
+                
+                // Destination filter
+                if (destinationFilter !== 'ALL' && s.destination !== destinationFilter) return false;
+                
+                // Text search
+                if (searchTerm) {
+                    const searchFields = [
+                        s.awb,
+                        s.customer,
+                        s.origin,
+                        s.destination,
+                        s.currentLocation,
+                        s.status,
+                        s.orderNumber,
+                        ...(s.failureReasons || [])
+                    ].filter(Boolean).map(f => String(f).toLowerCase());
+                    
+                    if (!searchFields.some(field => field.includes(searchTerm))) {
+                        return false;
+                    }
+                }
+                
                 return true;
             });
 
-            // Sort by most recent date first (lastUpdate field)
+            // Sort: Failures first, then by delay (most delayed first), then by date
             State.filteredShipments.sort((a, b) => {
+                // Failures first
+                if (a.isInFailureBucket && !b.isInFailureBucket) return -1;
+                if (!a.isInFailureBucket && b.isInFailureBucket) return 1;
+                
+                // Then by delay (most negative/delayed first)
+                if (a.delayedDays !== null && b.delayedDays !== null) {
+                    if (a.delayedDays !== b.delayedDays) {
+                        return a.delayedDays - b.delayedDays;
+                    }
+                }
+                
+                // Then by date (most recent first)
                 const dateA = parseShipmentDate(a.lastUpdate);
                 const dateB = parseShipmentDate(b.lastUpdate);
-                return dateB - dateA; // Descending (most recent first)
+                return dateB - dateA;
             });
 
             State.currentPage = 1;
+            updateActiveFilterCount();
+            updateFailureBucketAlert();
             renderKPIs();
             renderTable();
+        }
+
+        /**
+         * Update the failure bucket alert banner
+         */
+        function updateFailureBucketAlert() {
+            const failures = State.shipments.filter(s => s.isInFailureBucket);
+            const alertEl = document.getElementById('failureBucketAlert');
+            const countEl = document.getElementById('failureBucketCount');
+            const detailsEl = document.getElementById('failureBucketDetails');
+            const chipCountEl = document.getElementById('failureChipCount');
+            
+            if (failures.length > 0) {
+                // Count by reason
+                const delayed = failures.filter(s => s.isDelayed).length;
+                const breaches = failures.filter(s => s.lifecycleBreach).length;
+                const rto = failures.filter(s => s.statusCode === 'RTO').length;
+                const ndr = failures.filter(s => s.statusCode === 'NDR').length;
+                
+                const details = [];
+                if (delayed > 0) details.push(`${delayed} delayed`);
+                if (breaches > 0) details.push(`${breaches} lifecycle breach`);
+                if (rto > 0) details.push(`${rto} RTO`);
+                if (ndr > 0) details.push(`${ndr} NDR`);
+                
+                countEl.textContent = failures.length;
+                detailsEl.textContent = details.join(', ');
+                alertEl.classList.remove('hidden');
+                
+                // Update chip count
+                chipCountEl.textContent = failures.length;
+                chipCountEl.classList.remove('hidden');
+            } else {
+                alertEl.classList.add('hidden');
+                chipCountEl.classList.add('hidden');
+            }
+        }
+
+        function dismissFailureAlert() {
+            document.getElementById('failureBucketAlert').classList.add('hidden');
         }
 
         /**
@@ -1104,14 +1549,31 @@
             const inTransit = data.filter(s => ['INTRANSIT', 'OFD'].includes(s.statusCode)).length;
             const exceptions = data.filter(s => ['RTO', 'NDR', 'CANCELLED'].includes(s.statusCode)).length;
             const codValue = data.filter(s => s.type === 'COD').reduce((sum, s) => sum + (s.value || 0), 0);
-            const successRate = total > 0 ? Math.round((delivered / total) * 100) : 0;
+            
+            // SLA Metrics
+            const onTimeDeliveries = data.filter(s => s.statusCode === 'DELIVERED' && !s.isDelayed).length;
+            const onTimeRate = delivered > 0 ? Math.round((onTimeDeliveries / delivered) * 100) : 0;
+            const delayedCount = data.filter(s => s.isDelayed).length;
+            const breachCount = data.filter(s => s.lifecycleBreach).length;
+            
+            // Calculate average delay (only for delayed shipments)
+            const delayedShipments = data.filter(s => s.delayedDays !== null && s.delayedDays < 0);
+            const avgDelay = delayedShipments.length > 0 
+                ? Math.round(delayedShipments.reduce((sum, s) => sum + Math.abs(s.delayedDays), 0) / delayedShipments.length)
+                : 0;
 
+            // Primary KPIs
             document.getElementById('kpi-total').textContent = total.toLocaleString();
             document.getElementById('kpi-delivered').textContent = delivered.toLocaleString();
             document.getElementById('kpi-intransit').textContent = inTransit.toLocaleString();
             document.getElementById('kpi-exceptions').textContent = exceptions.toLocaleString();
-            document.getElementById('kpi-dsr').textContent = successRate + '%';
+            
+            // SLA KPIs
+            document.getElementById('kpi-dsr').textContent = onTimeRate + '%';
+            document.getElementById('kpi-delayed').textContent = delayedCount.toLocaleString();
+            document.getElementById('kpi-breach').textContent = breachCount.toLocaleString();
             document.getElementById('kpi-cod').textContent = '₹' + codValue.toLocaleString('en-IN');
+            document.getElementById('kpi-avgdelay').textContent = avgDelay > 0 ? `-${avgDelay} days` : '-- days';
 
             // Update exception badge
             const badge = document.getElementById('exceptionBadge');
@@ -1135,7 +1597,7 @@
             if (data.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="py-16 text-center">
+                        <td colspan="9" class="py-16 text-center">
                             <div class="flex flex-col items-center">
                                 <iconify-icon icon="solar:magnifer-linear" width="48" class="text-slate-300 mb-3"></iconify-icon>
                                 <p class="text-slate-500 font-medium">${State.shipments.length === 0 ? 'No shipments tracked yet' : 'No shipments match filters'}</p>
@@ -1156,41 +1618,45 @@
             const pageData = data.slice(start, end);
 
             tbody.innerHTML = pageData.map(s => {
-                const rowClass = getRowClass(s.statusCode);
                 const statusClass = getStatusClass(s.statusCode);
+                const rowClass = getLifecycleRowClass(s);
+                const delayDisplay = formatDelayDays(s.delayedDays);
+                const slaDisplay = formatSlaStatus(s);
+                const eddDisplay = formatEdd(s.edd);
                 
                 return `
-                <tr class="${rowClass} hover:bg-slate-50 cursor-pointer" onclick="viewShipment('${escapeHtml(s.awb)}')">
-                    <td class="py-3 px-5">
+                <tr class="${rowClass} hover:bg-slate-50/50 cursor-pointer transition-colors" onclick="viewShipment('${escapeHtml(s.awb)}')">
+                    <td class="py-3 px-4">
                         <span class="font-mono text-xs font-bold text-blue-600">${escapeHtml(s.awb)}</span>
                         ${s.orderNumber ? `<div class="text-[10px] text-slate-400 mt-0.5">#${escapeHtml(s.orderNumber)}</div>` : ''}
                     </td>
-                    <td class="py-3 px-5">
-                        <div class="text-xs font-medium text-slate-900 truncate max-w-[180px]" title="${escapeHtml(s.customer)}">${escapeHtml(s.customer)}</div>
+                    <td class="py-3 px-4">
+                        <div class="text-xs font-medium text-slate-900 truncate max-w-[150px]" title="${escapeHtml(s.customer)}">${escapeHtml(s.customer)}</div>
                         ${s.currentLocation ? `<div class="text-[10px] text-slate-400">@ ${escapeHtml(s.currentLocation)}</div>` : ''}
                     </td>
-                    <td class="py-3 px-5 text-xs">
+                    <td class="py-3 px-4 text-xs">
                         <span class="text-slate-500">${escapeHtml(s.origin)}</span>
-                        <iconify-icon icon="solar:arrow-right-linear" width="12" class="mx-1 text-slate-300"></iconify-icon>
+                        <iconify-icon icon="solar:arrow-right-linear" width="10" class="mx-0.5 text-slate-300"></iconify-icon>
                         <span class="text-slate-900 font-medium">${escapeHtml(s.destination)}</span>
                     </td>
-                    <td class="py-3 px-5">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${s.type === 'COD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${s.type}</span>
-                    </td>
-                    <td class="py-3 px-5 text-xs font-semibold text-slate-900">${s.type === 'COD' && s.value > 0 ? '₹' + (s.value || 0).toLocaleString('en-IN') : '-'}</td>
-                    <td class="py-3 px-5">
-                        <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusClass}">${escapeHtml(s.status)}</span>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusClass}">${escapeHtml(s.status)}</span>
                         ${s.isRto ? '<span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-rose-100 text-rose-700">RTO</span>' : ''}
                     </td>
-                    <td class="py-3 px-5 text-xs text-slate-500">${escapeHtml(s.lastUpdate) || 'N/A'}</td>
-                    <td class="py-3 px-5">
-                        <button onclick="event.stopPropagation(); viewShipment('${escapeHtml(s.awb)}')" class="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded" title="View Details">
-                            <iconify-icon icon="solar:eye-linear" width="16"></iconify-icon>
-                        </button>
-                        <button onclick="event.stopPropagation(); refreshSingle('${escapeHtml(s.awb)}')" class="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded" title="Refresh">
-                            <iconify-icon icon="solar:refresh-linear" width="16"></iconify-icon>
-                        </button>
-                        ${s.delPod ? `<a href="${escapeHtml(s.delPod)}" target="_blank" onclick="event.stopPropagation()" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="View POD"><iconify-icon icon="solar:gallery-check-linear" width="16"></iconify-icon></a>` : ''}
+                    <td class="py-3 px-4 text-xs text-slate-600">${eddDisplay}</td>
+                    <td class="py-3 px-4">${delayDisplay}</td>
+                    <td class="py-3 px-4">${slaDisplay}</td>
+                    <td class="py-3 px-4 text-xs text-slate-500">${escapeHtml(s.lastUpdate) || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-0.5">
+                            <button onclick="event.stopPropagation(); viewShipment('${escapeHtml(s.awb)}')" class="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded" title="View Details">
+                                <iconify-icon icon="solar:eye-linear" width="14"></iconify-icon>
+                            </button>
+                            <button onclick="event.stopPropagation(); refreshSingle('${escapeHtml(s.awb)}')" class="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded" title="Refresh">
+                                <iconify-icon icon="solar:refresh-linear" width="14"></iconify-icon>
+                            </button>
+                            ${s.delPod ? `<a href="${escapeHtml(s.delPod)}" target="_blank" onclick="event.stopPropagation()" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="View POD"><iconify-icon icon="solar:gallery-check-linear" width="14"></iconify-icon></a>` : ''}
+                        </div>
                     </td>
                 </tr>
             `}).join('');
@@ -1203,6 +1669,99 @@
             document.getElementById('nextBtn').disabled = State.currentPage === totalPages;
 
             subtitle.textContent = `${data.length} shipment${data.length !== 1 ? 's' : ''} tracked`;
+        }
+
+        /**
+         * Get row class based on lifecycle status
+         */
+        function getLifecycleRowClass(shipment) {
+            if (shipment.lifecycleBreach && shipment.isDelayed) return 'row-failure';
+            if (shipment.lifecycleBreach) return 'row-breach';
+            if (shipment.isDelayed && Math.abs(shipment.delayedDays) >= 3) return 'row-failure';
+            return '';
+        }
+
+        /**
+         * Format EDD for display
+         */
+        function formatEdd(edd) {
+            if (!edd) return '<span class="text-slate-400">--</span>';
+            // Format: "2025-07-07" -> "Jul 07"
+            try {
+                const date = parseApiDate(edd);
+                if (date) {
+                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    return `${months[date.getMonth()]} ${String(date.getDate()).padStart(2, '0')}`;
+                }
+            } catch (e) {}
+            return escapeHtml(edd);
+        }
+
+        /**
+         * Format delayed days with color coding
+         */
+        function formatDelayDays(days) {
+            if (days === null || days === undefined) {
+                return '<span class="text-slate-400 text-xs">--</span>';
+            }
+            
+            if (days < 0) {
+                // Late/Delayed (negative = days past EDD)
+                return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold delay-negative">
+                    <iconify-icon icon="solar:arrow-down-linear" width="10"></iconify-icon>
+                    ${days}d
+                </span>`;
+            } else if (days > 0) {
+                // Early (positive = days before EDD)
+                return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold delay-positive">
+                    <iconify-icon icon="solar:arrow-up-linear" width="10"></iconify-icon>
+                    +${days}d
+                </span>`;
+            } else {
+                // On time
+                return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold delay-neutral">
+                    <iconify-icon icon="solar:check-circle-linear" width="10"></iconify-icon>
+                    0d
+                </span>`;
+            }
+        }
+
+        /**
+         * Format SLA status badge
+         */
+        function formatSlaStatus(shipment) {
+            const { slaStatus, lifecycleBreach, failureReasons } = shipment;
+            
+            if (lifecycleBreach) {
+                return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold sla-critical" title="Lifecycle Breach: >15 days without terminal status">
+                    <iconify-icon icon="solar:danger-triangle-linear" width="10"></iconify-icon>
+                    BREACH
+                </span>`;
+            }
+            
+            switch(slaStatus) {
+                case 'ONTIME':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold sla-ontime">
+                        <iconify-icon icon="solar:verified-check-linear" width="10"></iconify-icon>
+                        On-Time
+                    </span>`;
+                case 'DELAYED':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold sla-delayed">
+                        <iconify-icon icon="solar:clock-circle-linear" width="10"></iconify-icon>
+                        Delayed
+                    </span>`;
+                case 'FAILED':
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold sla-delayed" title="${failureReasons?.join(', ') || 'Failed'}">
+                        <iconify-icon icon="solar:close-circle-linear" width="10"></iconify-icon>
+                        Failed
+                    </span>`;
+                case 'PENDING':
+                default:
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                        <iconify-icon icon="solar:hourglass-linear" width="10"></iconify-icon>
+                        Pending
+                    </span>`;
+            }
         }
 
         function getRowClass(statusCode) {

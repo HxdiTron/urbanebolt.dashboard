@@ -45,16 +45,6 @@
                     Overview
                 </a>
                 
-                <a href="manifest.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
-                    <iconify-icon icon="solar:clipboard-list-linear" width="18"></iconify-icon>
-                    Master Manifest
-                </a>
-
-                <a href="riders.html" class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-900">
-                    <iconify-icon icon="solar:user-hand-up-linear" width="18"></iconify-icon>
-                    Rider Allocation
-                </a>
-
                 <div class="px-3 pb-2 pt-6">
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">NDR & Finance</p>
                 </div>
@@ -185,17 +175,102 @@
         }
 
         /**
+         * Parse date strings from API format
+         */
+        function parseApiDate(dateStr) {
+            if (!dateStr) return null;
+            try {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    const date = new Date(year, month - 1, day);
+                    date.setHours(0, 0, 0, 0);
+                    return date;
+                }
+                const months = { 'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11 };
+                const match = dateStr.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
+                if (match) {
+                    const [, day, monthStr, year] = match;
+                    const month = months[monthStr];
+                    if (month !== undefined) {
+                        const date = new Date(parseInt(year), month, parseInt(day));
+                        date.setHours(0, 0, 0, 0);
+                        return date;
+                    }
+                }
+                const parsed = new Date(dateStr);
+                if (!isNaN(parsed.getTime())) {
+                    parsed.setHours(0, 0, 0, 0);
+                    return parsed;
+                }
+                return null;
+            } catch (e) { return null; }
+        }
+
+        /**
+         * Calculate lifecycle metrics for the shipment
+         */
+        function calculateLifecycle(data, statusCode) {
+            const LIFECYCLE_LIMIT_DAYS = 15;
+            const TERMINAL_STATUSES = ['DDL', 'RTO', 'CAN', 'LOST'];
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const createdAt = parseApiDate(data.addedOn);
+            const eddDate = parseApiDate(data.edd);
+            
+            let deliveredAt = null;
+            if (statusCode === 'DDL' && data.scans && data.scans.length > 0) {
+                const deliveryScan = data.scans.find(s => s.statusCode === 'DDL');
+                if (deliveryScan) deliveredAt = parseApiDate(deliveryScan.statusDateTime);
+            }
+            
+            let shipmentAgeDays = 0;
+            if (createdAt) shipmentAgeDays = Math.floor((today - createdAt) / (1000 * 60 * 60 * 24));
+            
+            const isTerminal = TERMINAL_STATUSES.includes(statusCode);
+            const lifecycleBreach = shipmentAgeDays > LIFECYCLE_LIMIT_DAYS && !isTerminal;
+            
+            let delayedDays = null;
+            if (eddDate) {
+                if (deliveredAt) {
+                    delayedDays = Math.floor((eddDate - deliveredAt) / (1000 * 60 * 60 * 24));
+                } else if (!isTerminal) {
+                    delayedDays = Math.floor((eddDate - today) / (1000 * 60 * 60 * 24));
+                }
+            }
+            
+            const isDelayed = delayedDays !== null && delayedDays < 0;
+            
+            let slaStatus = 'PENDING';
+            if (statusCode === 'DDL') {
+                slaStatus = isDelayed ? 'DELAYED' : 'ONTIME';
+            } else if (lifecycleBreach) {
+                slaStatus = 'BREACH';
+            } else if (isDelayed) {
+                slaStatus = 'DELAYED';
+            } else if (!isTerminal) {
+                slaStatus = 'PENDING';
+            } else {
+                slaStatus = 'FAILED';
+            }
+            
+            return { shipmentAgeDays, delayedDays, lifecycleBreach, isDelayed, slaStatus, deliveredAt };
+        }
+
+        /**
          * Render shipment details from API response
-         * API Fields: awbNumber, orderNumber, shipperName, origin, destination, 
-         * currentLocation, currentStatusDateTime, currentStatusCode, currentStatusCodeDescription,
-         * productType, weight, pieces, addedOn, edd, isRto, rto_status, delPod, scans[]
          */
         function renderShipment(data) {
+            const statusCode = data.currentStatusCode || '';
+            const lifecycle = calculateLifecycle(data, statusCode);
+            
             const shipment = {
                 awb: String(data.awbNumber || ''),
                 orderNumber: data.orderNumber || '',
                 status: data.currentStatusCodeDescription || data.currentStatusCode || 'Unknown',
-                statusCode: data.currentStatusCode || '',
+                statusCode: statusCode,
                 customer: data.shipperName || 'N/A',
                 origin: data.origin || 'N/A',
                 destination: data.destination || 'N/A',
@@ -212,6 +287,7 @@
                 reasonCode: data.currentReasonCode || '',
                 reasonDescription: data.currentReasonCodeDescription || '',
                 scans: data.scans || [],
+                ...lifecycle,
             };
             
             // Find delivery date from scans if delivered
@@ -288,6 +364,55 @@
                     
                     <!-- Sidebar -->
                     <div class="space-y-6">
+                        <!-- SLA Status Card -->
+                        <div class="bg-white rounded-xl premium-border premium-shadow p-6 ${shipment.lifecycleBreach ? 'ring-2 ring-orange-400' : shipment.isDelayed ? 'ring-2 ring-rose-400' : ''}">
+                            <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                SLA Status
+                                ${shipment.lifecycleBreach ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 animate-pulse">BREACH</span>' : ''}
+                            </h3>
+                            <div class="space-y-4">
+                                <!-- Delay Indicator -->
+                                <div class="p-4 rounded-lg ${shipment.delayedDays !== null && shipment.delayedDays < 0 ? 'bg-rose-50 border border-rose-200' : shipment.delayedDays !== null && shipment.delayedDays >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200'}">
+                                    <p class="text-[10px] font-semibold text-slate-500 uppercase mb-1">Delay Status</p>
+                                    ${shipment.delayedDays !== null ? `
+                                        <p class="text-2xl font-bold ${shipment.delayedDays < 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                                            ${shipment.delayedDays < 0 ? shipment.delayedDays : '+' + shipment.delayedDays} days
+                                        </p>
+                                        <p class="text-xs ${shipment.delayedDays < 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                                            ${shipment.delayedDays < 0 ? 'Past EDD' : shipment.delayedDays === 0 ? 'On schedule' : 'Ahead of schedule'}
+                                        </p>
+                                    ` : '<p class="text-lg font-semibold text-slate-400">-- days</p><p class="text-xs text-slate-400">No EDD available</p>'}
+                                </div>
+                                
+                                <!-- Lifecycle -->
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-slate-500">Shipment Age</span>
+                                    <span class="font-semibold ${shipment.shipmentAgeDays > 15 ? 'text-orange-600' : 'text-slate-900'}">${shipment.shipmentAgeDays} days</span>
+                                </div>
+                                <div class="flex items-center justify-between text-xs">
+                                    <span class="text-slate-500">SLA Status</span>
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                        shipment.slaStatus === 'ONTIME' ? 'bg-emerald-100 text-emerald-700' :
+                                        shipment.slaStatus === 'DELAYED' ? 'bg-rose-100 text-rose-700' :
+                                        shipment.slaStatus === 'BREACH' ? 'bg-orange-100 text-orange-700' :
+                                        shipment.slaStatus === 'FAILED' ? 'bg-rose-100 text-rose-700' :
+                                        'bg-slate-100 text-slate-600'
+                                    }">${shipment.slaStatus}</span>
+                                </div>
+                                
+                                ${shipment.lifecycleBreach ? `
+                                <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg mt-2">
+                                    <p class="text-xs font-semibold text-orange-800 flex items-center gap-1">
+                                        <iconify-icon icon="solar:danger-triangle-bold" width="12"></iconify-icon>
+                                        Lifecycle Breach
+                                    </p>
+                                    <p class="text-[10px] text-orange-600 mt-1">Shipment exceeded 15 days without terminal status</p>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        <!-- Key Dates -->
                         <div class="bg-white rounded-xl premium-border premium-shadow p-6">
                             <h3 class="text-sm font-bold text-slate-900 mb-4">Key Dates</h3>
                             <div class="space-y-3 text-xs">
@@ -295,9 +420,9 @@
                                     <span class="text-slate-500">Added On</span>
                                     <span class="font-semibold text-slate-900">${escapeHtml(shipment.addedOn)}</span>
                                 </div>
-                                <div class="flex justify-between">
+                                <div class="flex justify-between items-center">
                                     <span class="text-slate-500">EDD</span>
-                                    <span class="font-semibold text-slate-900">${escapeHtml(shipment.edd)}</span>
+                                    <span class="font-semibold ${shipment.isDelayed ? 'text-rose-600' : 'text-slate-900'}">${escapeHtml(shipment.edd)}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-slate-500">Last Update</span>

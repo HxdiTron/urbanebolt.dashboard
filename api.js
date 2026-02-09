@@ -281,7 +281,7 @@ const API = (() => {
         
         // If same request is pending, return existing promise
         if (pendingRequests.has(key)) {
-            console.log('[API] Deduplicating request:', endpoint);
+            if (DEBUG) console.log('[API] Deduplicating request');
             return pendingRequests.get(key);
         }
 
@@ -302,7 +302,7 @@ const API = (() => {
 
         // Enforce hard limit
         if (endpoints.length > CONFIG.maxConcurrent) {
-            console.warn(`[API] Batch size ${endpoints.length} exceeds limit ${CONFIG.maxConcurrent}. Processing in chunks.`);
+            if (DEBUG) console.warn(`[API] Batch size exceeds limit, processing in chunks`);
         }
 
         const results = [];
@@ -316,7 +316,7 @@ const API = (() => {
         // Process chunks sequentially
         for (let i = 0; i < chunks.length; i++) {
             const chunk = chunks[i];
-            console.log(`[API] Processing batch ${i + 1}/${chunks.length} (${chunk.length} requests)`);
+            if (DEBUG) console.log(`[API] Processing batch ${i + 1}/${chunks.length}`);
 
             const chunkResults = await Promise.allSettled(
                 chunk.map(ep => deduplicatedRequest(ep, options))
@@ -393,7 +393,7 @@ const API = (() => {
 
             // Enforce limit
             if (uniqueAwbs.length > 20) {
-                console.warn(`[API] Truncating to 20 AWBs (requested: ${uniqueAwbs.length})`);
+                if (DEBUG) console.warn(`[API] Truncating to 20 AWBs`);
                 uniqueAwbs.length = 20;
             }
 
