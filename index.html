@@ -2257,6 +2257,8 @@
                 terminalStatus: lifecycle.terminalStatus,
                 isDeliveredSuccess: lifecycle.isDeliveredSuccess,
                 isDeliveredLate: lifecycle.isDeliveredLate,
+                rdcDangerNoOfdToday: lifecycle.rdcDangerNoOfdToday,
+                rdcOfdLate: lifecycle.rdcOfdLate,
             };
         }
 
@@ -2306,10 +2308,11 @@
                 deliveredAt.setHours(0, 0, 0, 0);
             }
 
-            // OFD time
+            // OFD / RDC analysis
             let ofdAt = parseApiDate(apiData.ofd_time);
-            if (!ofdAt && apiData.scans && apiData.scans.length > 0) {
-                const ofdScan = apiData.scans.find(s => s.statusCode === 'OFD');
+            const scans = Array.isArray(apiData.scans) ? apiData.scans : [];
+            if (!ofdAt && scans.length > 0) {
+                const ofdScan = scans.find(s => s.statusCode === 'OFD');
                 if (ofdScan) ofdAt = parseApiDate(ofdScan.statusDateTime);
             }
 
@@ -2382,13 +2385,87 @@
             // Lifecycle breach (>15 days, non-terminal) – still disabled for now
             const lifecycleBreach = false;
 
-            // Failure bucket: for now, treat **RTO** as hard failure bucket.
-            // Delivered is success, everything else is pending/normal.
+            // Failure bucket: for now, treat **RTO** as hard failure bucket and
+            // also treat certain RDC/OFD issues as dangerous failures.
             const failureReasons = [];
             let isInFailureBucket = false;
             if (terminalStatus === 'rto') {
                 isInFailureBucket = true;
                 failureReasons.push('RTO');
+            }
+
+            // RDC + OFD business rules
+            // 1) If shipment stage is RDC and there is no OFD for that date → dangerous failure
+            // 2) If stage is RDC and next OFD (or "now" if none) is >60 minutes later → orange warning
+            let rdcDangerNoOfdToday = false;
+            let rdcOfdLate = false;
+
+            if (scans.length > 0) {
+                // Helper to parse full datetime from scan (keep time component)
+                const parseScanDateTime = (value) => {
+                    if (!value) return null;
+                    const d = new Date(value);
+                    return isNaN(d.getTime()) ? null : d;
+                };
+                const sameCalendarDay = (d1, d2) =>
+                    d1 && d2 &&
+                    d1.getFullYear() === d2.getFullYear() &&
+                    d1.getMonth() === d2.getMonth() &&
+                    d1.getDate() === d2.getDate();
+
+                // Sort scans chronologically (oldest → newest)
+                const scansWithTs = scans
+                    .map(s => ({ ...s, _ts: parseScanDateTime(s.statusDateTime) }))
+                    .filter(s => s._ts)
+                    .sort((a, b) => a._ts - b._ts);
+
+                let rdcScan = null;
+                let ofdAfterRdc = null;
+
+                for (const scan of scansWithTs) {
+                    if (scan.statusCode === 'RDC') {
+                        rdcScan = scan; // last RDC in the sequence
+                        ofdAfterRdc = null; // reset, we only care about OFD after the latest RDC
+                    } else if (rdcScan && !ofdAfterRdc && scan.statusCode === 'OFD' && scan._ts >= rdcScan._ts) {
+                        ofdAfterRdc = scan;
+                    }
+                }
+
+                if (rdcScan) {
+                    const rdcTs = rdcScan._ts;
+                    const now = new Date();
+
+                    // Current stage considered "RDC" if:
+                    // - currentStatusCode is RDC, OR
+                    // - the last scan's statusCode is RDC
+                    const lastScan = scansWithTs[scansWithTs.length - 1];
+                    const isRdcStage =
+                        String(apiData.currentStatusCode || '').toUpperCase() === 'RDC' ||
+                        (lastScan && lastScan.statusCode === 'RDC');
+
+                    if (isRdcStage) {
+                        // Rule 1: no OFD on the same calendar date as RDC scan
+                        const hasOfdSameDay = scansWithTs.some(s =>
+                            s.statusCode === 'OFD' && sameCalendarDay(rdcTs, s._ts)
+                        );
+                        if (!hasOfdSameDay) {
+                            rdcDangerNoOfdToday = true;
+                            isInFailureBucket = true;
+                            failureReasons.push('RDC without OFD today');
+                        }
+
+                        // Rule 2: OFD should happen within 60 minutes of RDC
+                        let minutesToOfd = null;
+                        if (ofdAfterRdc && ofdAfterRdc._ts) {
+                            minutesToOfd = (ofdAfterRdc._ts.getTime() - rdcTs.getTime()) / 60000;
+                        } else {
+                            minutesToOfd = (now.getTime() - rdcTs.getTime()) / 60000;
+                        }
+                        if (minutesToOfd !== null && minutesToOfd > 60) {
+                            rdcOfdLate = true;
+                        }
+                    }
+                }
             }
 
             // Delivery success rule simplified: any delivered is success, RTO is failure, others pending
@@ -2424,6 +2501,8 @@
                 terminalStatus,
                 isDeliveredSuccess,
                 isDeliveredLate,
+                rdcDangerNoOfdToday,
+                rdcOfdLate,
             };
         }
 
@@ -2938,6 +3017,12 @@
          * Get row class based on lifecycle status
          */
         function getLifecycleRowClass(shipment) {
+            // Very dangerous RDC failure: highlight as hard failure (red)
+            if (shipment.rdcDangerNoOfdToday) return 'row-failure';
+
+            // RDC where OFD is >60 minutes late: warning (orange)
+            if (shipment.rdcOfdLate) return 'row-breach';
+
             if (shipment.lifecycleBreach && shipment.isDelayed) return 'row-failure';
             if (shipment.lifecycleBreach) return 'row-breach';
             if (shipment.isDelayed && Math.abs(shipment.delayedDays) >= 3) return 'row-failure';
