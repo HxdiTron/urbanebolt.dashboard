@@ -8,6 +8,10 @@
     <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <!-- Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- SheetJS for Excel parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -168,39 +172,109 @@
                 </div>
             </div>
             
-            <!-- SEARCH & TRACK SECTION -->
-            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div class="flex flex-col lg:flex-row gap-4">
-                    <!-- AWB Search -->
-                    <div class="flex-1">
-                        <div class="flex gap-2">
-                            <div class="relative flex-1">
-                                <iconify-icon icon="solar:magnifer-linear" width="18" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
-                                <input type="text" id="awbSearchInput" 
-                                    placeholder="Track shipment by AWB number..." 
-                                    class="w-full text-sm bg-slate-50 border-0 rounded-xl pl-11 pr-4 py-3 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all">
-                            </div>
-                            <button onclick="trackSingleAWB()" id="trackBtn"
-                                class="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl hover:from-blue-700 hover:to-blue-800 flex items-center gap-2 whitespace-nowrap shadow-sm shadow-blue-200 transition-all">
-                                <iconify-icon icon="solar:magnifer-linear" width="16"></iconify-icon>
-                                Track
-                            </button>
+            <!-- Manual AWB Search & Excel Upload -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Single AWB Search -->
+                    <div class="relative flex-1 min-w-[200px] max-w-sm">
+                        <iconify-icon icon="solar:magnifer-linear" width="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
+                        <input type="text" id="awbSearchInput" 
+                            placeholder="Search AWB..." 
+                            class="w-full text-sm bg-slate-50 border-0 rounded-lg pl-9 pr-4 py-2.5 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all">
+                    </div>
+                    <button onclick="trackSingleAWB()" id="trackBtn"
+                        class="px-4 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 flex items-center gap-2 transition-all">
+                        <iconify-icon icon="solar:magnifer-linear" width="14"></iconify-icon>
+                        Search
+                    </button>
+                    
+                    <div class="h-8 w-px bg-slate-200 hidden md:block"></div>
+                    
+                    <!-- Bulk Input -->
+                    <input type="text" id="bulkAwbInput" placeholder="Bulk: AWB1, AWB2..." 
+                        class="flex-1 min-w-[150px] text-sm bg-slate-50 border-0 rounded-lg px-3 py-2.5 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 outline-none hidden md:block">
+                    <button onclick="trackBulkAWB()" id="bulkTrackBtn"
+                        class="px-3 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-all hidden md:flex items-center gap-1">
+                        <iconify-icon icon="solar:layers-linear" width="14"></iconify-icon>
+                        Bulk
+                    </button>
+                    
+                    <div class="h-8 w-px bg-slate-200 hidden md:block"></div>
+                    
+                    <!-- Excel Upload -->
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleExcelUpload(event)">
+                    <button onclick="document.getElementById('excelFileInput').click()" 
+                        class="px-4 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center gap-2">
+                        <iconify-icon icon="solar:file-text-linear" width="16"></iconify-icon>
+                        <span class="hidden sm:inline">Upload Excel</span>
+                        <span class="sm:hidden">Excel</span>
+                    </button>
+                </div>
+                
+                <!-- Excel Upload Progress/Preview (Hidden by default) -->
+                <div id="excelUploadPanel" class="hidden mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <iconify-icon icon="solar:file-check-linear" width="20" class="text-emerald-600"></iconify-icon>
+                            <span id="excelFileName" class="text-sm font-medium text-slate-900">file.xlsx</span>
+                        </div>
+                        <button onclick="closeExcelPanel()" class="text-slate-400 hover:text-slate-600">
+                            <iconify-icon icon="solar:close-circle-linear" width="18"></iconify-icon>
+                        </button>
+                    </div>
+                    
+                    <!-- Column Selection -->
+                    <div id="excelColumnSelect" class="mb-4">
+                        <label class="block text-[10px] font-semibold text-slate-500 uppercase mb-2">Select AWB Column</label>
+                        <div id="excelColumns" class="flex flex-wrap gap-2">
+                            <!-- Column buttons will be inserted here -->
                         </div>
                     </div>
-
-                    <!-- Bulk Search -->
-                    <div class="lg:w-96">
-                        <div class="flex gap-2">
-                            <div class="relative flex-1">
-                                <iconify-icon icon="solar:layers-linear" width="18" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
-                                <input type="text" id="bulkAwbInput" 
-                                    placeholder="Bulk track: AWB1, AWB2, AWB3..." 
-                                    class="w-full text-sm bg-slate-50 border-0 rounded-xl pl-11 pr-4 py-3 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all">
+                    
+                    <!-- Preview -->
+                    <div id="excelPreview" class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[10px] font-semibold text-slate-500 uppercase">Preview (first 10)</span>
+                            <span id="excelAwbCount" class="text-xs text-slate-500">0 AWBs found</span>
+                        </div>
+                        <div id="excelAwbPreview" class="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                            <!-- AWB chips will be inserted here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Large file warning -->
+                    <div id="excelLargeFileWarning" class="hidden mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div class="flex items-start gap-2">
+                            <iconify-icon icon="solar:info-circle-linear" width="18" class="text-amber-600 mt-0.5"></iconify-icon>
+                            <div>
+                                <p class="text-xs font-semibold text-amber-800">Large file detected</p>
+                                <p class="text-[10px] text-amber-700 mt-0.5">
+                                    <span id="excelEtaEstimate">~X minutes</span> estimated. 
+                                    You can pause/resume during import. Data saves automatically every 5 batches.
+                                </p>
                             </div>
-                            <button onclick="trackBulkAWB()" id="bulkTrackBtn"
-                                class="px-5 py-3 text-sm font-semibold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 flex items-center gap-2 transition-all">
-                                <iconify-icon icon="solar:upload-linear" width="16"></iconify-icon>
-                                Bulk
+                        </div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="flex items-center justify-between pt-3 border-t border-slate-200">
+                        <div class="flex flex-col gap-2">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="excelFullDataMode" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" checked onchange="onExcelModeToggle()">
+                                <span class="text-xs text-slate-700 font-medium">This Excel already contains shipment data (skip API)</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" id="excelSetAsLiveRange" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                                <span class="text-xs text-slate-600">Use as Live Board range</span>
+                            </label>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="closeExcelPanel()" class="px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-all">
+                                Cancel
+                            </button>
+                            <button onclick="trackExcelAwbs()" id="trackExcelBtn" class="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-all flex items-center gap-2">
+                                <iconify-icon icon="solar:play-linear" width="14"></iconify-icon>
+                                Import <span id="excelTrackCount">0</span>
                             </button>
                         </div>
                     </div>
@@ -316,7 +390,7 @@
                     </div>
                     <h3 id="kpi-total" class="text-2xl font-bold text-slate-900">0</h3>
                     <p class="text-[10px] text-slate-400 mt-1">Shipments tracked</p>
-            </div>
+                </div>
 
                 <div class="bg-white rounded-xl p-5 premium-border premium-shadow">
                     <div class="flex justify-between items-start mb-3">
@@ -651,7 +725,8 @@
             document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-IN', { 
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
             });
-            document.getElementById('dateFilter').valueAsDate = new Date();
+            const d = new Date();
+            document.getElementById('dateFilter').value = d.toISOString().slice(0, 10); // YYYY-MM-DD
 
             // Keyboard shortcuts
             document.getElementById('awbSearchInput').addEventListener('keydown', (e) => {
@@ -676,7 +751,7 @@
                 }
             }, 1000);
 
-            // Set up hourly auto-refresh
+            // Set up hourly auto-refresh for manually tracked AWBs
             setInterval(() => {
                 if (DataLayer.getTrackedAwbs().length > 0) {
                     console.log('[AutoSync] Hourly refresh triggered');
@@ -1105,6 +1180,1013 @@
         }
 
         // =====================================================
+        // EXCEL FILE UPLOAD & PARSING
+        // =====================================================
+        const ExcelUpload = {
+            workbook: null,
+            sheetData: [],
+            rowObjects: [], // [{Header: value, ...}]
+            columns: [],
+            selectedColumn: null,
+            extractedAwbs: [],
+            hasHeaders: true,
+            awbHeaderKey: null,
+        };
+
+        function onExcelModeToggle() {
+            // In full-data mode, we still need AWB column, but UX is "import rows" vs "track AWBs"
+            renderExcelPreview();
+        }
+
+        function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileName = file.name;
+            const fileExt = fileName.split('.').pop().toLowerCase();
+            
+            if (!['xlsx', 'xls', 'csv'].includes(fileExt)) {
+                showToast('Please upload an Excel (.xlsx, .xls) or CSV file', 'error');
+                return;
+            }
+
+            showToast(`Reading ${fileName}...`, 'info');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    ExcelUpload.workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Get first sheet
+                    const firstSheet = ExcelUpload.workbook.SheetNames[0];
+                    const worksheet = ExcelUpload.workbook.Sheets[firstSheet];
+                    
+                    // Convert to JSON (both: array-of-arrays and object-rows)
+                    ExcelUpload.sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+                    ExcelUpload.rowObjects = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+                    
+                    if (ExcelUpload.sheetData.length === 0) {
+                        showToast('Excel file is empty', 'error');
+                        return;
+                    }
+                    
+                    // Get columns from first row (headers)
+                    ExcelUpload.columns = ExcelUpload.sheetData[0] || [];
+                    ExcelUpload.hasHeaders = ExcelUpload.columns.some(c => String(c || '').trim().length > 0);
+                    
+                    // Show panel
+                    document.getElementById('excelFileName').textContent = fileName;
+                    renderExcelColumns();
+                    document.getElementById('excelUploadPanel').classList.remove('hidden');
+                    
+                    // Auto-select AWB column if found
+                    autoSelectAwbColumn();
+                    renderExcelPreview();
+                    
+                } catch (error) {
+                    console.error('[Excel] Parse error:', error);
+                    showToast('Failed to parse Excel file', 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            
+            // Reset file input
+            event.target.value = '';
+        }
+
+        function renderExcelColumns() {
+            const container = document.getElementById('excelColumns');
+            container.innerHTML = '';
+            
+            ExcelUpload.columns.forEach((col, index) => {
+                const colName = col || `Column ${index + 1}`;
+                const btn = document.createElement('button');
+                btn.className = 'px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ' +
+                    (ExcelUpload.selectedColumn === index 
+                        ? 'bg-emerald-100 border-emerald-400 text-emerald-800' 
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300');
+                btn.textContent = colName;
+                btn.onclick = () => selectExcelColumn(index);
+                container.appendChild(btn);
+            });
+            
+            // If no headers, show column indices
+            if (ExcelUpload.columns.length === 0 && ExcelUpload.sheetData.length > 0) {
+                const numCols = ExcelUpload.sheetData[0]?.length || 1;
+                for (let i = 0; i < numCols; i++) {
+                    const btn = document.createElement('button');
+                    btn.className = 'px-3 py-1.5 text-xs font-medium rounded-lg border bg-white border-slate-200 text-slate-600 hover:border-slate-300 transition-all';
+                    btn.textContent = `Column ${String.fromCharCode(65 + i)}`;
+                    btn.onclick = () => selectExcelColumn(i);
+                    container.appendChild(btn);
+                }
+            }
+        }
+
+        function autoSelectAwbColumn() {
+            // Try to find AWB column by name
+            const awbKeywords = ['awb', 'awb_number', 'awbnumber', 'tracking', 'tracking_number', 'shipment', 'waybill', 'consignment'];
+            
+            for (let i = 0; i < ExcelUpload.columns.length; i++) {
+                const colName = String(ExcelUpload.columns[i] || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (awbKeywords.some(kw => colName.includes(kw))) {
+                    selectExcelColumn(i);
+                    return;
+                }
+            }
+            
+            // Default to first column
+            if (ExcelUpload.columns.length > 0 || ExcelUpload.sheetData.length > 0) {
+                selectExcelColumn(0);
+            }
+        }
+
+        function selectExcelColumn(index) {
+            ExcelUpload.selectedColumn = index;
+            // Remember header key for AWB in rowObjects (for full-data mode)
+            ExcelUpload.awbHeaderKey = null;
+            if (ExcelUpload.hasHeaders && ExcelUpload.columns[index]) {
+                ExcelUpload.awbHeaderKey = ExcelUpload.columns[index];
+            }
+            
+            // Extract AWBs from selected column
+            const awbSet = new Set();
+            const startRow = ExcelUpload.hasHeaders ? 1 : 0; // Skip header if exists
+            
+            for (let i = startRow; i < ExcelUpload.sheetData.length; i++) {
+                const row = ExcelUpload.sheetData[i];
+                if (row && row[index] !== undefined && row[index] !== null && row[index] !== '') {
+                    const awb = String(row[index]).trim();
+                    // Validate: only alphanumeric, reasonable length
+                    if (/^[a-zA-Z0-9]+$/.test(awb) && awb.length >= 5 && awb.length <= 30) {
+                        awbSet.add(awb);
+                    }
+                }
+            }
+            ExcelUpload.extractedAwbs = Array.from(awbSet);
+            
+            // Update UI
+            renderExcelColumns(); // Re-render to update selection
+            renderExcelPreview();
+        }
+
+        function renderExcelPreview() {
+            const previewContainer = document.getElementById('excelAwbPreview');
+            const countEl = document.getElementById('excelAwbCount');
+            const trackCountEl = document.getElementById('excelTrackCount');
+            const warningEl = document.getElementById('excelLargeFileWarning');
+            const etaEl = document.getElementById('excelEtaEstimate');
+            const fullDataMode = document.getElementById('excelFullDataMode')?.checked;
+            
+            const awbs = ExcelUpload.extractedAwbs;
+            const rowsCount = ExcelUpload.rowObjects?.length ? ExcelUpload.rowObjects.length : Math.max(0, ExcelUpload.sheetData.length - 1);
+            countEl.textContent = fullDataMode
+                ? `${rowsCount.toLocaleString()} rows loaded • ${awbs.length.toLocaleString()} unique AWBs`
+                : `${awbs.length.toLocaleString()} AWBs found`;
+            trackCountEl.textContent = fullDataMode ? `${rowsCount.toLocaleString()} rows` : `${awbs.length.toLocaleString()} AWBs`;
+            
+            // Show first 10 as preview
+            const preview = awbs.slice(0, 10);
+            previewContainer.innerHTML = preview.map(awb => 
+                `<span class="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-700">${escapeHtml(awb)}</span>`
+            ).join('');
+            
+            if (awbs.length > 10) {
+                previewContainer.innerHTML += `<span class="px-2 py-1 text-xs text-slate-400">+${(awbs.length - 10).toLocaleString()} more</span>`;
+            }
+            
+            if (awbs.length === 0) {
+                previewContainer.innerHTML = '<span class="text-xs text-slate-400">No valid AWBs found in selected column</span>';
+            }
+            
+            // Show large file warning for 100+ AWBs
+            const big = fullDataMode ? rowsCount : awbs.length;
+            if (big > 1000) {
+                // Rough ETA: in full-data mode this is fast; in API mode it's slow
+                const etaMinutes = fullDataMode ? Math.ceil(big / 20000) : Math.ceil((Math.ceil(big / 20) * 2.5) / 60);
+                etaEl.textContent = `~${etaMinutes} minutes`;
+                warningEl.classList.remove('hidden');
+            } else {
+                warningEl.classList.add('hidden');
+            }
+        }
+
+        function closeExcelPanel() {
+            document.getElementById('excelUploadPanel').classList.add('hidden');
+        }
+
+        // Excel Import State for large files
+        const ExcelImport = {
+            isRunning: false,
+            isPaused: false,
+            currentBatch: 0,
+            totalBatches: 0,
+            totalSuccess: 0,
+            totalFail: 0,
+            awbs: [],
+            rows: [],
+            mode: 'FULL_DATA', // FULL_DATA or AWB_ONLY
+            startTime: null,
+        };
+
+        async function trackExcelAwbs() {
+            const awbs = ExcelUpload.extractedAwbs;
+
+            // We always use FULL_DATA mode (Excel already contains shipment data)
+            if (!ExcelUpload.rowObjects || !ExcelUpload.rowObjects.length) {
+                showToast('No parsed rows found in Excel. Please check the file and try again.', 'error');
+                return;
+            }
+
+            closeExcelPanel();
+
+            // Initialize import state
+            ExcelImport.isRunning = true;
+            ExcelImport.isPaused = false;
+            ExcelImport.currentBatch = 0;
+            ExcelImport.totalSuccess = 0;
+            ExcelImport.totalFail = 0;
+            ExcelImport.mode = 'FULL_DATA';
+            ExcelImport.awbs = awbs;
+            ExcelImport.rows = ExcelUpload.rowObjects || [];
+            ExcelImport.startTime = Date.now();
+
+            // Show progress UI
+            showExcelImportProgress();
+
+            const rowsCount = ExcelImport.rows.length;
+            const estMinutes = Math.max(1, Math.ceil(rowsCount / 20000)); // very rough
+            showToast(`Importing ${rowsCount.toLocaleString()} rows from Excel...`, 'info');
+            await importShipmentsFromExcelRows();
+        }
+
+        function normalizeHeaderKey(key) {
+            return String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        }
+
+        function buildRowKeyMap(row) {
+            const map = new Map();
+            Object.keys(row || {}).forEach(k => {
+                const nk = normalizeHeaderKey(k);
+                if (!map.has(nk)) map.set(nk, k);
+            });
+            return map;
+        }
+
+        function pickRowValue(row, keyMap, candidates) {
+            for (const c of candidates) {
+                const actual = keyMap.get(normalizeHeaderKey(c));
+                if (actual && row[actual] !== undefined && row[actual] !== null && String(row[actual]).trim() !== '') {
+                    return row[actual];
+                }
+            }
+            return '';
+        }
+
+        function toBool(v) {
+            const s = String(v || '').toLowerCase().trim();
+            return s === 'true' || s === '1' || s === 'yes' || s === 'y';
+        }
+
+        function toNumber(v) {
+            const n = parseFloat(String(v || '').replace(/[^\d.\-]/g, ''));
+            return Number.isFinite(n) ? n : 0;
+        }
+
+        function normalizeExcelRowToApiData(row) {
+            // Prefer the user-selected AWB column if available
+            let awb = '';
+            if (ExcelUpload.awbHeaderKey && row.hasOwnProperty(ExcelUpload.awbHeaderKey)) {
+                awb = String(row[ExcelUpload.awbHeaderKey] || '').trim();
+            }
+
+            const keyMap = buildRowKeyMap(row);
+
+            if (!awb) {
+                awb = pickRowValue(row, keyMap, ['awb', 'awbnumber', 'awb_number', 'waybill', 'consignment', 'tracking', 'trackingnumber', 'tracking_number', 'awb_no']);
+            }
+            const statusCode = pickRowValue(row, keyMap, ['currentstatuscode', 'statuscode', 'status_code', 'status']);
+            const statusDesc = pickRowValue(row, keyMap, ['currentstatuscodedescription', 'statusdescription', 'status_desc', 'statusdescription', 'currentstatus', 'status']);
+            const deliveredOn = pickRowValue(row, keyMap, ['deliveredon', 'deliverydate', 'delivered_date', 'delivery_date']);
+
+            return {
+                awbNumber: awb,
+                booking_date: pickRowValue(row, keyMap, ['booking_date', 'bookingdate', 'pickup_date', 'pickupdate']),
+                pickup_time: pickRowValue(row, keyMap, ['pickup_time', 'pickupdatetime', 'pickup_date', 'pickupdate']),
+                ofd_time: pickRowValue(row, keyMap, ['ofd_time', 'ofd_datetime', 'ofddate']),
+                first_scan_time: pickRowValue(row, keyMap, ['first_scan_time', 'firstscantime', 'first_scan']),
+                last_event_time: pickRowValue(row, keyMap, ['last_event_time', 'lasteventtime', 'last_update_time', 'lastupdatetime']),
+                terminal_status: pickRowValue(row, keyMap, ['terminal_status', 'delivery_status', 'status_final']),
+                orderNumber: pickRowValue(row, keyMap, ['ordernumber', 'order_number', 'orderid', 'order_id']),
+                pieces: toNumber(pickRowValue(row, keyMap, ['pieces', 'piece', 'qty', 'quantity'])) || 1,
+                addedOn: pickRowValue(row, keyMap, ['addedon', 'createdat', 'created_at', 'created', 'bookingdate', 'booking_date']),
+                invoiceDate: pickRowValue(row, keyMap, ['invoicedate', 'invoice_date']),
+                invoiceNumber: pickRowValue(row, keyMap, ['invoicenumber', 'invoice_number', 'invoicevalue', 'invoice_value', 'amount', 'codamount', 'cod_amount', 'value']),
+                shipperName: pickRowValue(row, keyMap, [
+                    'shippername', 'shipper_name',
+                    'customer', 'customername', 'customer_name',
+                    'client', 'merchant',
+                    'consignee', 'consignee_name',
+                    'sender_name', 'sendername', 'sender'
+                ]) || pickRowValue(row, keyMap, ['receiver_name', 'receivername', 'receiver']),
+                origin: pickRowValue(row, keyMap, ['origin', 'from', 'source']),
+                destination: pickRowValue(row, keyMap, ['destination', 'to', 'dest']),
+                currentLocation: pickRowValue(row, keyMap, ['currentlocation', 'current_location', 'location', 'hub']),
+                edd: pickRowValue(row, keyMap, ['edd', 'expecteddeliverydate', 'expected_delivery_date']),
+                currentStatusDateTime: pickRowValue(row, keyMap, ['currentstatusdatetime', 'currentstatusdatetime', 'lastupdate', 'last_update', 'statusdatetime', 'updatedat', 'updated_at']),
+                currentStatusCode: statusCode || statusDesc, // if only description exists, normalizeStatusCode can still map
+                currentStatusCodeDescription: statusDesc || statusCode,
+                currentReasonCode: pickRowValue(row, keyMap, ['reasoncode', 'reason_code']),
+                currentReasonCodeDescription: pickRowValue(row, keyMap, ['reason', 'reasondescription', 'reason_description']),
+                isRto: toBool(pickRowValue(row, keyMap, ['isrto', 'rto', 'is_rto'])),
+                weight: toNumber(pickRowValue(row, keyMap, ['weight', 'wt'])),
+                productType: pickRowValue(row, keyMap, ['producttype', 'product_type', 'type', 'paymenttype', 'payment_type']),
+                delPod: pickRowValue(row, keyMap, ['delpod', 'pod', 'podurl', 'pod_url']),
+                deliveredOn: deliveredOn,
+                scans: [],
+            };
+        }
+
+        async function importShipmentsFromExcelRows() {
+            const rows = ExcelImport.rows || [];
+            if (!rows.length) {
+                // Fallback: if no headers/objects, use AWB-only mode
+                showToast('No row objects found. Switch off full-data mode or ensure headers exist.', 'error');
+                ExcelImport.isRunning = false;
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) overlay.classList.add('hidden');
+                return;
+            }
+
+            // Treat as a streaming import to avoid UI freezing
+            const CHUNK_SIZE = 500;
+            ExcelImport.totalBatches = Math.ceil(rows.length / CHUNK_SIZE);
+            ExcelImport.currentBatch = 0;
+
+            let hadError = false;
+
+            try {
+                for (let i = 0; i < rows.length && ExcelImport.isRunning; i++) {
+                    while (ExcelImport.isPaused && ExcelImport.isRunning) {
+                        await sleep(200);
+                    }
+                    if (!ExcelImport.isRunning) break;
+
+                    // Update progress at chunk boundaries
+                    if (i % CHUNK_SIZE === 0) {
+                        ExcelImport.currentBatch = Math.floor(i / CHUNK_SIZE) + 1;
+                        updateExcelImportProgress();
+                        await sleep(0);
+                    }
+
+                    try {
+                        const apiData = normalizeExcelRowToApiData(rows[i]);
+                        if (!apiData.awbNumber) {
+                            ExcelImport.totalFail++;
+                            continue;
+                        }
+
+                        const shipment = normalizeShipmentData(apiData);
+                        // Drop heavy fields for memory/localStorage safety
+                        shipment.rawData = undefined;
+                        if (Array.isArray(shipment.scans) && shipment.scans.length > 50) {
+                            shipment.scans = shipment.scans.slice(0, 50);
+                        }
+
+                        ExcelImport.totalSuccess++;
+                    } catch (rowError) {
+                        console.warn('[ExcelImport] Skipping bad row', rowError);
+                        ExcelImport.totalFail++;
+                        hadError = true;
+                        continue;
+                    }
+                }
+
+                // Replace state with ALL imported rows (1 row → 1 shipment)
+                State.shipments = rows
+                    .map(r => {
+                        try {
+                            return normalizeShipmentData(normalizeExcelRowToApiData(r));
+                        } catch (e) {
+                            console.warn('[ExcelImport] Failed to normalize row during finalization', e);
+                            hadError = true;
+                            return null;
+                        }
+                    })
+                    .filter(s => s && s.awb); // keep only rows with AWB
+
+                // Trim heavy fields before caching to improve localStorage reliability
+                State.shipments.forEach(s => {
+                    if ('rawData' in s) {
+                        s.rawData = undefined;
+                    }
+                    if (Array.isArray(s.scans) && s.scans.length > 50) {
+                        s.scans = s.scans.slice(0, 50);
+                    }
+                });
+                State.trackedAwbs = new Set(State.shipments.map(s => s.awb));
+
+                // Render & cache (best-effort)
+                updateFilterDropdowns();
+                applyFiltersAndRender();
+                updateFailureBucketAlert();
+
+                // Best-effort cache: may exceed quota for 20k rows; we keep UI working even if cache fails
+                try {
+                    DataLayer.saveCache(State.shipments);
+                } catch (e) {
+                    console.warn('[ExcelImport] Failed to cache shipments', e);
+                }
+                DataLayer.updateLastSync();
+                updateLastSyncDisplay();
+            } catch (e) {
+                console.error('[ExcelImport] Fatal import error', e);
+                hadError = true;
+            } finally {
+                // Complete UI cleanup – ALWAYS run, even on errors
+                ExcelImport.isRunning = false;
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.classList.add('hidden');
+                    overlay.innerHTML = `
+                        <div class="bg-white rounded-xl p-8 flex flex-col items-center shadow-2xl">
+                            <iconify-icon icon="solar:refresh-linear" width="40" class="text-blue-600 animate-spin mb-4"></iconify-icon>
+                            <p class="text-slate-900 font-semibold">Tracking Shipments...</p>
+                            <p id="loadingStatus" class="text-slate-500 text-sm mt-1">Connecting to API</p>
+                        </div>
+                    `;
+                }
+
+                const duration = Math.round((Date.now() - ExcelImport.startTime) / 1000);
+                if (State.shipments && State.shipments.length) {
+                    const msg = hadError
+                        ? `Excel import completed with some skipped rows. Imported ${State.shipments.length.toLocaleString()} shipments (${duration}s).`
+                        : `Imported ${State.shipments.length.toLocaleString()} shipments from Excel (${duration}s)`;
+                    showToast(msg, hadError ? 'error' : 'success');
+                } else if (hadError) {
+                    showToast('Excel import failed. Please check the file format and try again.', 'error');
+                }
+
+                // Resume live board if configured
+                if (LiveBoard.config.startAwb && LiveBoard.config.endAwb) {
+                    LiveBoard.isPaused = false;
+                    updateLiveUI();
+                    startCountdown();
+                }
+
+                updateRateLimitStatus();
+            }
+        }
+
+        function showExcelImportProgress() {
+            // Replace loading overlay with persistent progress bar
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-lg mx-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-emerald-100 rounded-lg">
+                                <iconify-icon icon="solar:file-text-linear" width="24" class="text-emerald-600"></iconify-icon>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-900">Excel Import</h3>
+                                <p class="text-xs text-slate-500">${(ExcelImport.rows ? ExcelImport.rows.length : 0).toLocaleString()} rows</p>
+                            </div>
+                        </div>
+                        <button onclick="toggleExcelImportPause()" id="excelPauseBtn" class="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-100 rounded-lg hover:bg-amber-200 transition-all">
+                            Pause
+                        </button>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                            <span id="excelImportStatus">Processing...</span>
+                            <span id="excelImportPercent">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                            <div id="excelImportBar" class="bg-gradient-to-r from-emerald-500 to-teal-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-4 gap-3 text-center">
+                        <div class="bg-slate-50 rounded-lg p-2">
+                            <p class="text-lg font-bold text-slate-900" id="excelBatchNum">0</p>
+                            <p class="text-[10px] text-slate-500">Batch</p>
+                        </div>
+                        <div class="bg-emerald-50 rounded-lg p-2">
+                            <p class="text-lg font-bold text-emerald-600" id="excelSuccessNum">0</p>
+                            <p class="text-[10px] text-slate-500">Found</p>
+                        </div>
+                        <div class="bg-slate-50 rounded-lg p-2">
+                            <p class="text-lg font-bold text-slate-400" id="excelFailNum">0</p>
+                            <p class="text-[10px] text-slate-500">Not Found</p>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-2">
+                            <p class="text-lg font-bold text-blue-600" id="excelEtaNum">--</p>
+                            <p class="text-[10px] text-slate-500">ETA (min)</p>
+                        </div>
+                    </div>
+                    
+                    <p class="text-[10px] text-slate-400 text-center mt-3">
+                        Processing in batches of 20 with rate limit protection
+                    </p>
+                </div>
+            `;
+            overlay.classList.remove('hidden');
+        }
+
+        function updateExcelImportProgress() {
+            const percent = Math.round((ExcelImport.currentBatch / ExcelImport.totalBatches) * 100);
+            const elapsed = (Date.now() - ExcelImport.startTime) / 1000;
+            const avgBatchTime = ExcelImport.currentBatch > 0 ? elapsed / ExcelImport.currentBatch : 2.5;
+            const remainingBatches = ExcelImport.totalBatches - ExcelImport.currentBatch;
+            const etaMinutes = Math.ceil((remainingBatches * avgBatchTime) / 60);
+            
+            document.getElementById('excelImportBar').style.width = `${percent}%`;
+            document.getElementById('excelImportPercent').textContent = `${percent}%`;
+            document.getElementById('excelBatchNum').textContent = `${ExcelImport.currentBatch}/${ExcelImport.totalBatches}`;
+            document.getElementById('excelSuccessNum').textContent = ExcelImport.totalSuccess.toLocaleString();
+            document.getElementById('excelFailNum').textContent = ExcelImport.totalFail.toLocaleString();
+            document.getElementById('excelEtaNum').textContent = etaMinutes > 0 ? etaMinutes : '<1';
+            
+            const status = ExcelImport.isPaused ? 'Paused' : `Batch ${ExcelImport.currentBatch} of ${ExcelImport.totalBatches}`;
+            document.getElementById('excelImportStatus').textContent = status;
+        }
+
+        function toggleExcelImportPause() {
+            ExcelImport.isPaused = !ExcelImport.isPaused;
+            const btn = document.getElementById('excelPauseBtn');
+            
+            if (ExcelImport.isPaused) {
+                btn.textContent = 'Resume';
+                btn.classList.remove('text-amber-700', 'bg-amber-100', 'hover:bg-amber-200');
+                btn.classList.add('text-emerald-700', 'bg-emerald-100', 'hover:bg-emerald-200');
+                showToast('Import paused. Click Resume to continue.', 'info');
+            } else {
+                btn.textContent = 'Pause';
+                btn.classList.add('text-amber-700', 'bg-amber-100', 'hover:bg-amber-200');
+                btn.classList.remove('text-emerald-700', 'bg-emerald-100', 'hover:bg-emerald-200');
+                showToast('Import resumed', 'success');
+            }
+            
+            updateExcelImportProgress();
+        }
+
+        async function processExcelBatches(batchSize) {
+            const { awbs, totalBatches } = ExcelImport;
+            
+            for (let i = ExcelImport.currentBatch; i < totalBatches && ExcelImport.isRunning; i++) {
+                // Check if paused
+                while (ExcelImport.isPaused && ExcelImport.isRunning) {
+                    await sleep(500);
+                }
+                
+                if (!ExcelImport.isRunning) break;
+                
+                ExcelImport.currentBatch = i + 1;
+                updateExcelImportProgress();
+                
+                const start = i * batchSize;
+                const end = Math.min(start + batchSize, awbs.length);
+                const batch = awbs.slice(start, end);
+                
+                try {
+                    const results = await API.tracking.getMultiple(batch);
+                    
+                    results.forEach(result => {
+                        if (result.success && result.data) {
+                            const shipment = normalizeShipmentData(result.data);
+                            const existingIndex = State.shipments.findIndex(s => s.awb === shipment.awb);
+                            if (existingIndex >= 0) {
+                                State.shipments[existingIndex] = shipment;
+                            } else {
+                                State.shipments.unshift(shipment);
+                            }
+                            State.trackedAwbs.add(shipment.awb);
+                            DataLayer.addAwb(shipment.awb);
+                            ExcelImport.totalSuccess++;
+                        } else {
+                            ExcelImport.totalFail++;
+                        }
+                    });
+                    
+                    // Save every 5 batches to reduce I/O
+                    if (i % 5 === 0 || i === totalBatches - 1) {
+                        DataLayer.saveCache(State.shipments);
+                        updateFilterDropdowns();
+                        applyFiltersAndRender();
+                    }
+                    
+                    updateExcelImportProgress();
+                    
+                    // Delay between batches (2 seconds for rate limit safety)
+                    if (i < totalBatches - 1) {
+                        await sleep(2000);
+                    }
+                    
+                } catch (batchError) {
+                    console.error(`[Excel] Batch ${i + 1} error:`, batchError);
+                    ExcelImport.totalFail += batch.length;
+                    
+                    if (batchError.message && batchError.message.includes('Rate limit')) {
+                        document.getElementById('excelImportStatus').textContent = 'Rate limited - waiting 10s...';
+                        await sleep(10000);
+                    } else {
+                        await sleep(2000);
+                    }
+                }
+            }
+            
+            // Complete
+            ExcelImport.isRunning = false;
+            DataLayer.saveCache(State.shipments);
+            DataLayer.updateLastSync();
+            updateLastSyncDisplay();
+            updateFilterDropdowns();
+            applyFiltersAndRender();
+            
+            // Hide progress overlay
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            
+            // Restore loading overlay HTML
+            document.getElementById('loadingOverlay').innerHTML = `
+                <div class="bg-white rounded-xl p-8 flex flex-col items-center shadow-2xl">
+                    <iconify-icon icon="solar:refresh-linear" width="40" class="text-blue-600 animate-spin mb-4"></iconify-icon>
+                    <p class="text-slate-900 font-semibold">Tracking Shipments...</p>
+                    <p id="loadingStatus" class="text-slate-500 text-sm mt-1">Connecting to API</p>
+                </div>
+            `;
+            
+            // Show completion toast
+            const duration = Math.round((Date.now() - ExcelImport.startTime) / 1000 / 60);
+            showToast(
+                `Excel import complete: ${ExcelImport.totalSuccess.toLocaleString()} found, ${ExcelImport.totalFail.toLocaleString()} not found (${duration} min)`, 
+                ExcelImport.totalFail > 0 ? 'info' : 'success'
+            );
+            
+            // Resume live board if configured
+            if (LiveBoard.config.startAwb && LiveBoard.config.endAwb) {
+                LiveBoard.isPaused = false;
+                updateLiveUI();
+                startCountdown();
+            }
+            
+            updateRateLimitStatus();
+        }
+
+        // =====================================================
+        // LIVE BOARD - AUTOMATIC CONTINUOUS TRACKING
+        // =====================================================
+        const LiveBoard = {
+            isRunning: false,
+            isPaused: false,
+            currentBatch: 0,
+            totalBatches: 0,
+            foundCount: 0,
+            awbsToFetch: [],
+            batchSize: 20,
+            delayBetweenBatches: 2000, // 2 seconds between batches
+            refreshInterval: 300, // 5 minutes default (in seconds)
+            countdownTimer: null,
+            countdownSeconds: 0,
+            config: {
+                startAwb: '',
+                endAwb: '',
+                interval: 300,
+            },
+            CONFIG_KEY: 'urbanebolt_liveboard_config',
+        };
+
+        // Load saved config
+        function loadLiveBoardConfig() {
+            try {
+                const saved = localStorage.getItem(LiveBoard.CONFIG_KEY);
+                if (saved) {
+                    const config = JSON.parse(saved);
+                    LiveBoard.config = { ...LiveBoard.config, ...config };
+                    LiveBoard.refreshInterval = config.interval || 300;
+                    
+                    // Populate inputs
+                    document.getElementById('awbSeriesStart').value = config.startAwb || '';
+                    document.getElementById('awbSeriesEnd').value = config.endAwb || '';
+                    document.getElementById('refreshInterval').value = config.interval || 300;
+                }
+            } catch (e) {
+                console.warn('[LiveBoard] Failed to load config:', e);
+            }
+        }
+
+        // Save config
+        function saveLiveBoardConfig() {
+            try {
+                localStorage.setItem(LiveBoard.CONFIG_KEY, JSON.stringify(LiveBoard.config));
+            } catch (e) {
+                console.warn('[LiveBoard] Failed to save config:', e);
+            }
+        }
+
+        function generateAwbSeries(start, end) {
+            const startNum = parseInt(start);
+            const endNum = parseInt(end);
+            
+            if (isNaN(startNum) || isNaN(endNum)) {
+                throw new Error('Invalid AWB numbers. Must be numeric.');
+            }
+            
+            if (endNum < startNum) {
+                throw new Error('End AWB must be greater than Start AWB');
+            }
+            
+            const count = endNum - startNum + 1;
+            if (count > 50000) {
+                throw new Error('Maximum 50,000 AWBs in a series. Please reduce the range.');
+            }
+            
+            const awbs = [];
+            for (let i = startNum; i <= endNum; i++) {
+                awbs.push(String(i));
+            }
+            return awbs;
+        }
+
+        function updateLiveUI() {
+            const dot = document.getElementById('liveDot');
+            const statusText = document.getElementById('liveStatusText');
+            const rangeDisplay = document.getElementById('liveRangeDisplay');
+            const countdown = document.getElementById('nextRefreshCountdown');
+            const progressBar = document.getElementById('liveProgressBar');
+            const progressLabel = document.getElementById('liveProgressLabel');
+            const progressStats = document.getElementById('liveProgressStats');
+            const toggleBtn = document.getElementById('liveModeToggle');
+            const toggleIcon = document.getElementById('liveModeIcon');
+            const toggleText = document.getElementById('liveModeText');
+            const indicator = document.getElementById('liveIndicator');
+
+            // Update range display
+            if (LiveBoard.config.startAwb && LiveBoard.config.endAwb) {
+                rangeDisplay.textContent = `AWB: ${LiveBoard.config.startAwb} → ${LiveBoard.config.endAwb}`;
+            } else {
+                rangeDisplay.textContent = 'AWB Range: Not configured';
+            }
+
+            if (LiveBoard.isPaused) {
+                dot.classList.remove('animate-pulse', 'bg-white');
+                dot.classList.add('bg-yellow-400');
+                statusText.textContent = 'PAUSED';
+                indicator.classList.remove('bg-white/20');
+                indicator.classList.add('bg-yellow-500/30');
+                toggleIcon.setAttribute('icon', 'solar:play-linear');
+                toggleText.textContent = 'Resume';
+                countdown.textContent = 'PAUSED';
+            } else if (LiveBoard.isRunning) {
+                dot.classList.add('animate-pulse', 'bg-white');
+                dot.classList.remove('bg-yellow-400');
+                statusText.textContent = 'SCANNING';
+                indicator.classList.add('bg-white/20');
+                indicator.classList.remove('bg-yellow-500/30');
+                toggleIcon.setAttribute('icon', 'solar:pause-linear');
+                toggleText.textContent = 'Pause';
+                
+                const processed = LiveBoard.currentBatch * LiveBoard.batchSize;
+                const total = LiveBoard.awbsToFetch.length;
+                const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+                
+                progressBar.style.width = `${percent}%`;
+                progressLabel.textContent = `Batch ${LiveBoard.currentBatch}/${LiveBoard.totalBatches}`;
+                progressStats.textContent = `${Math.min(processed, total)}/${total} AWBs • Found: ${LiveBoard.foundCount}`;
+                countdown.textContent = 'SCANNING';
+            } else {
+                dot.classList.add('animate-pulse', 'bg-white');
+                dot.classList.remove('bg-yellow-400');
+                statusText.textContent = 'LIVE';
+                indicator.classList.add('bg-white/20');
+                indicator.classList.remove('bg-yellow-500/30');
+                toggleIcon.setAttribute('icon', 'solar:pause-linear');
+                toggleText.textContent = 'Pause';
+                
+                progressBar.style.width = '100%';
+                progressLabel.textContent = `Last scan: ${LiveBoard.foundCount} shipments`;
+                progressStats.textContent = `Total tracked: ${State.shipments.length}`;
+            }
+        }
+
+        function updateCountdown() {
+            const countdown = document.getElementById('nextRefreshCountdown');
+            if (LiveBoard.isPaused || LiveBoard.isRunning) return;
+            
+            const mins = Math.floor(LiveBoard.countdownSeconds / 60);
+            const secs = LiveBoard.countdownSeconds % 60;
+            countdown.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            
+            if (LiveBoard.countdownSeconds <= 0) {
+                startLiveScan();
+            } else {
+                LiveBoard.countdownSeconds--;
+            }
+        }
+
+        function startCountdown() {
+            if (LiveBoard.countdownTimer) {
+                clearInterval(LiveBoard.countdownTimer);
+            }
+            LiveBoard.countdownSeconds = LiveBoard.refreshInterval;
+            LiveBoard.countdownTimer = setInterval(updateCountdown, 1000);
+            updateCountdown();
+        }
+
+        function toggleLiveSettings() {
+            const panel = document.getElementById('liveSettingsPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function applyLiveSettings() {
+            const startAwb = document.getElementById('awbSeriesStart').value.trim();
+            const endAwb = document.getElementById('awbSeriesEnd').value.trim();
+            const interval = parseInt(document.getElementById('refreshInterval').value);
+            
+            if (!startAwb || !endAwb) {
+                showToast('Please enter both Start and End AWB numbers', 'error');
+                return;
+            }
+            
+            try {
+                // Validate range
+                generateAwbSeries(startAwb, endAwb);
+                
+                LiveBoard.config.startAwb = startAwb;
+                LiveBoard.config.endAwb = endAwb;
+                LiveBoard.config.interval = interval;
+                LiveBoard.refreshInterval = interval;
+                
+                saveLiveBoardConfig();
+                toggleLiveSettings();
+                updateLiveUI();
+                
+                showToast('Settings saved! Starting scan...', 'success');
+                
+                // Start scanning immediately
+                startLiveScan();
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function toggleLiveMode() {
+            LiveBoard.isPaused = !LiveBoard.isPaused;
+            
+            if (LiveBoard.isPaused) {
+                // Pause - stop countdown
+                if (LiveBoard.countdownTimer) {
+                    clearInterval(LiveBoard.countdownTimer);
+                }
+                showToast('Live board paused', 'info');
+            } else {
+                // Resume - start countdown
+                if (LiveBoard.config.startAwb && LiveBoard.config.endAwb) {
+                    showToast('Live board resumed', 'success');
+                    startCountdown();
+                } else {
+                    showToast('Please configure AWB range first', 'warning');
+                    toggleLiveSettings();
+                    LiveBoard.isPaused = true;
+                }
+            }
+            
+            updateLiveUI();
+        }
+
+        async function startLiveScan() {
+            if (LiveBoard.isRunning || LiveBoard.isPaused) return;
+            
+            const { startAwb, endAwb } = LiveBoard.config;
+            
+            if (!startAwb || !endAwb) {
+                // No config - show settings
+                toggleLiveSettings();
+                return;
+            }
+            
+            try {
+                const awbs = generateAwbSeries(startAwb, endAwb);
+                
+                // Reset state
+                LiveBoard.isRunning = true;
+                LiveBoard.currentBatch = 0;
+                LiveBoard.totalBatches = Math.ceil(awbs.length / LiveBoard.batchSize);
+                LiveBoard.foundCount = 0;
+                LiveBoard.awbsToFetch = awbs;
+                
+                updateLiveUI();
+                
+                // Process batches
+                await processLiveBatches();
+                
+            } catch (error) {
+                console.error('[LiveBoard] Scan error:', error);
+                LiveBoard.isRunning = false;
+                updateLiveUI();
+            }
+        }
+
+        async function processLiveBatches() {
+            const { awbsToFetch, batchSize, totalBatches, delayBetweenBatches } = LiveBoard;
+            
+            for (let i = 0; i < totalBatches && LiveBoard.isRunning && !LiveBoard.isPaused; i++) {
+                LiveBoard.currentBatch = i + 1;
+                updateLiveUI();
+                
+                const start = i * batchSize;
+                const end = Math.min(start + batchSize, awbsToFetch.length);
+                const batchAwbs = awbsToFetch.slice(start, end);
+                
+                try {
+                    const results = await API.tracking.getMultiple(batchAwbs);
+                    
+                    results.forEach(result => {
+                        if (result.success && result.data) {
+                            const shipment = normalizeShipmentData(result.data);
+                            const existingIndex = State.shipments.findIndex(s => s.awb === shipment.awb);
+                            if (existingIndex >= 0) {
+                                State.shipments[existingIndex] = shipment;
+                            } else {
+                                State.shipments.unshift(shipment);
+                            }
+                            State.trackedAwbs.add(shipment.awb);
+                            DataLayer.addAwb(shipment.awb);
+                            LiveBoard.foundCount++;
+                        }
+                    });
+                    
+                    // Update display after each batch
+                    DataLayer.saveCache(State.shipments);
+                    updateFilterDropdowns();
+                    applyFiltersAndRender();
+                    updateLiveUI();
+                    
+                    // Delay before next batch
+                    if (i < totalBatches - 1 && LiveBoard.isRunning && !LiveBoard.isPaused) {
+                        await sleep(delayBetweenBatches);
+                    }
+                    
+                } catch (error) {
+                    console.error(`[LiveBoard] Batch ${i + 1} error:`, error);
+                    if (error.message && error.message.includes('Rate limit')) {
+                        await sleep(5000);
+                    }
+                }
+            }
+            
+            // Complete - schedule next scan
+            LiveBoard.isRunning = false;
+            DataLayer.updateLastSync();
+            updateLastSyncDisplay();
+            updateLiveUI();
+            updateRateLimitStatus();
+            
+            if (!LiveBoard.isPaused) {
+                startCountdown();
+            }
+        }
+
+        // Legacy function for manual start
+        function startLiveBoard() {
+            applyLiveSettings();
+        }
+
+        function stopLiveBoard() {
+            LiveBoard.isPaused = true;
+            LiveBoard.isRunning = false;
+            if (LiveBoard.countdownTimer) {
+                clearInterval(LiveBoard.countdownTimer);
+            }
+            updateLiveUI();
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Auto-start live board on page load
+        function initLiveBoard() {
+            loadLiveBoardConfig();
+            updateLiveUI();
+            
+            // Auto-start if configured
+            if (LiveBoard.config.startAwb && LiveBoard.config.endAwb) {
+                setTimeout(() => {
+                    startLiveScan();
+                }, 2000); // 2 second delay after page load
+            } else {
+                // Show settings panel if not configured
+                setTimeout(() => {
+                    toggleLiveSettings();
+                }, 1000);
+            }
+        }
+
+        // =====================================================
         // NORMALIZE API DATA
         // =====================================================
         /**
@@ -1160,102 +2242,188 @@
                 deliveredAt: lifecycle.deliveredAt,
                 shipmentAgeDays: lifecycle.shipmentAgeDays,
                 delayedDays: lifecycle.delayedDays,
+                tatExpectedDays: lifecycle.tatExpectedDays,
+                tatActualDays: lifecycle.tatActualDays,
+                tatBreach: lifecycle.tatBreach,
+                tatOnTime: lifecycle.tatOnTime,
+                ofdAgeingDays: lifecycle.ofdAgeingDays,
+                isOfdAgeing: lifecycle.isOfdAgeing,
                 isTerminal: lifecycle.isTerminal,
                 lifecycleBreach: lifecycle.lifecycleBreach,
                 isDelayed: lifecycle.isDelayed,
                 isInFailureBucket: lifecycle.isInFailureBucket,
                 failureReasons: lifecycle.failureReasons,
                 slaStatus: lifecycle.slaStatus,
+                terminalStatus: lifecycle.terminalStatus,
+                isDeliveredSuccess: lifecycle.isDeliveredSuccess,
+                isDeliveredLate: lifecycle.isDeliveredLate,
             };
         }
 
         /**
-         * Calculate lifecycle metrics for a shipment
-         * Rules:
-         * 1. Terminal statuses: DELIVERED, RTO, CANCELLED, LOST
-         * 2. Lifecycle breach: >15 days and not terminal
-         * 3. Delay = deliveredDate - EDD (if delivered) or today - EDD (if not)
-         * 4. Failure bucket: delayed OR lifecycle breach OR invalid transition
+         * Calculate full SLA / lifecycle metrics for a shipment
+         * Implements:
+         * - TAT SLA (primary)
+         * - EDD delay (secondary)
+         * - OFD ageing
+         * - Lifecycle breach
+         * - Failure bucket membership
          */
         function calculateLifecycleMetrics(apiData, statusCode) {
             const LIFECYCLE_LIMIT_DAYS = 15;
             const TERMINAL_STATUSES = ['DELIVERED', 'RTO', 'CANCELLED', 'LOST'];
-            
-            // Get today's date at midnight (timezone-safe)
+            const FAILURE_TERMINAL_STATUSES = ['DDL', 'RTO', 'UD', 'SAL', 'LOST', 'DAMAGED'];
+
+            // Today (IST-ish) at midnight
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            
-            // Parse created date (addedOn format: "06 Jul 2025")
-            const createdAt = parseApiDate(apiData.addedOn);
-            
-            // Parse EDD (format: "2025-07-07" or "07 Jul 2025")
-            const eddDate = parseApiDate(apiData.edd);
-            
-            // Parse delivery date from scans (find DDL scan)
+
+            // Booking / pickup dates
+            const bookingAt = parseApiDate(
+                apiData.booking_date || apiData.addedOn || apiData.pickup_time || apiData.first_scan_time
+            );
+            const pickupAt = parseApiDate(
+                apiData.pickup_time || apiData.first_scan_time || apiData.booking_date || apiData.addedOn
+            );
+
+            // EDD
+            const eddDate = parseApiDate(apiData.edd || apiData.edd_date || apiData.expected_delivery_date);
+
+            // Delivery time
             let deliveredAt = null;
-            if (statusCode === 'DELIVERED' && apiData.scans && apiData.scans.length > 0) {
-                const deliveryScan = apiData.scans.find(s => s.statusCode === 'DDL');
-                if (deliveryScan) {
-                    deliveredAt = parseApiDate(deliveryScan.statusDateTime);
+            if (apiData.delivered_at) {
+                deliveredAt = new Date(apiData.delivered_at);
+            } else if (statusCode === 'DELIVERED' && apiData.scans && apiData.scans.length > 0) {
+                const deliveryScan = apiData.scans.find(s => s.statusCode === 'DDL' || s.statusCode === 'DELIVERED');
+                if (deliveryScan) deliveredAt = new Date(deliveryScan.statusDateTime);
+            } else if (apiData.deliveredOn) {
+                deliveredAt = parseApiDate(apiData.deliveredOn);
+            } else if (apiData.last_event_time) {
+                deliveredAt = new Date(apiData.last_event_time);
+            }
+            if (deliveredAt) {
+                // Normalize to midnight for day math
+                deliveredAt.setHours(0, 0, 0, 0);
+            }
+
+            // OFD time
+            let ofdAt = parseApiDate(apiData.ofd_time);
+            if (!ofdAt && apiData.scans && apiData.scans.length > 0) {
+                const ofdScan = apiData.scans.find(s => s.statusCode === 'OFD');
+                if (ofdScan) ofdAt = parseApiDate(ofdScan.statusDateTime);
+            }
+
+            // Lifecycle age
+            let lifecycleDays = 0;
+            if (bookingAt) {
+                lifecycleDays = Math.floor((today - bookingAt) / (1000 * 60 * 60 * 24));
+            }
+
+            // Terminal status (normalize different provider / Excel variants)
+            let terminalStatusRaw = (apiData.terminal_status || '').toString().trim().toLowerCase();
+            let terminalStatus = '';
+
+            if (terminalStatusRaw) {
+                if (['delivered', 'ddl', 'del'].includes(terminalStatusRaw)) {
+                    terminalStatus = 'delivered';
+                } else if (terminalStatusRaw.startsWith('rto')) {
+                    terminalStatus = 'rto';
+                } else if (['ndr', 'ud'].includes(terminalStatusRaw) || terminalStatusRaw.startsWith('undeliver')) {
+                    terminalStatus = 'ud';
+                } else if (terminalStatusRaw.includes('lost')) {
+                    terminalStatus = 'lost';
+                } else if (terminalStatusRaw.includes('cancel')) {
+                    terminalStatus = 'cancelled';
+                } else {
+                    terminalStatus = terminalStatusRaw;
                 }
             }
-            
-            // Calculate shipment age in days
-            let shipmentAgeDays = 0;
-            if (createdAt) {
-                shipmentAgeDays = Math.floor((today - createdAt) / (1000 * 60 * 60 * 24));
+
+            // If terminal_status is missing, derive from normalized statusCode
+            if (!terminalStatus) {
+                if (statusCode === 'DELIVERED') terminalStatus = 'delivered';
+                else if (statusCode === 'RTO') terminalStatus = 'rto';
+                else if (statusCode === 'NDR') terminalStatus = 'ud';
             }
-            
-            // Check if terminal status
-            const isTerminal = TERMINAL_STATUSES.includes(statusCode);
-            
-            // Check lifecycle breach (>15 days and not terminal)
-            const lifecycleBreach = shipmentAgeDays > LIFECYCLE_LIMIT_DAYS && !isTerminal;
-            
-            // Calculate delayed days
-            // Negative = late, Positive = early, 0 = on time
+            const isTerminal = TERMINAL_STATUSES.includes(statusCode) || !!terminalStatus;
+
+            // TAT SLA (kept for metrics, but breaches are not used in UI for now)
+            let tatExpectedDays = null;
+            let tatActualDays = null;
+            const originCity = apiData.origin || apiData.origin_city;
+            const destCity = apiData.destination || apiData.destination_city;
+            if (originCity && destCity) {
+                tatExpectedDays = laneSlaDays(originCity, destCity, pickupAt, eddDate);
+            }
+            if (pickupAt && tatExpectedDays !== null) {
+                const tatEnd = deliveredAt || today;
+                tatActualDays = Math.max(
+                    0,
+                    Math.floor((tatEnd - pickupAt) / (1000 * 60 * 60 * 24))
+                );
+            }
+            const tatBreach = false;
+            const tatOnTime = terminalStatus === 'delivered';
+
+            // EDD delay (secondary)
             let delayedDays = null;
             if (eddDate) {
-                if (deliveredAt) {
-                    delayedDays = Math.floor((eddDate - deliveredAt) / (1000 * 60 * 60 * 24));
-                } else if (!isTerminal) {
-                    delayedDays = Math.floor((eddDate - today) / (1000 * 60 * 60 * 24));
-                } else if (statusCode === 'RTO' || statusCode === 'CANCELLED') {
-                    delayedDays = Math.floor((eddDate - today) / (1000 * 60 * 60 * 24));
-                }
+                const actualDeliveryDate = deliveredAt || today;
+                // NOTE: late = negative values, as per UI:
+                // 1 day late  → -1, 2 days late → -2, etc.
+                delayedDays = Math.floor((eddDate - actualDeliveryDate) / (1000 * 60 * 60 * 24));
             }
-            
-            // Is delayed? (negative delayed days means late)
             const isDelayed = delayedDays !== null && delayedDays < 0;
-            
-            // Determine failure reasons
+
+            // OFD ageing
+            let ofdAgeingDays = 0;
+            const isOfdAgeing = false;
+
+            // Lifecycle breach (>15 days, non-terminal) – still disabled for now
+            const lifecycleBreach = false;
+
+            // Failure bucket: for now, treat **RTO** as hard failure bucket.
+            // Delivered is success, everything else is pending/normal.
             const failureReasons = [];
-            if (isDelayed) failureReasons.push('Delayed');
-            if (lifecycleBreach) failureReasons.push('Lifecycle Breach');
-            if (statusCode === 'RTO') failureReasons.push('RTO');
-            if (statusCode === 'CANCELLED') failureReasons.push('Cancelled');
-            if (statusCode === 'NDR') failureReasons.push('NDR');
-            
-            // Is in failure bucket?
-            const isInFailureBucket = failureReasons.length > 0;
-            
-            // Determine SLA status
-            let slaStatus = 'PENDING';
-            if (statusCode === 'DELIVERED') {
-                slaStatus = isDelayed ? 'DELAYED' : 'ONTIME';
-            } else if (lifecycleBreach) {
-                slaStatus = 'BREACH';
-            } else if (isDelayed) {
-                slaStatus = 'DELAYED';
-            } else if (!isTerminal) {
-                slaStatus = 'PENDING';
-            } else {
-                slaStatus = 'FAILED';
+            let isInFailureBucket = false;
+            if (terminalStatus === 'rto') {
+                isInFailureBucket = true;
+                failureReasons.push('RTO');
             }
-            
+
+            // Delivery success rule simplified: any delivered is success, RTO is failure, others pending
+            const isDeliveredSuccess = terminalStatus === 'delivered';
+            const isDeliveredLate = false;
+
+            // SLA status label (for badge)
+            let slaStatus = 'PENDING';
+            if (terminalStatus === 'delivered') {
+                slaStatus = 'ONTIME';
+            } else if (terminalStatus === 'rto') {
+                slaStatus = 'FAILURE';
+            }
+
             return {
-                createdAt, deliveredAt, eddDate, shipmentAgeDays, delayedDays,
-                isTerminal, lifecycleBreach, isDelayed, isInFailureBucket, failureReasons, slaStatus,
+                createdAt: bookingAt,
+                deliveredAt,
+                eddDate,
+                shipmentAgeDays: lifecycleDays,
+                delayedDays,
+                tatExpectedDays,
+                tatActualDays,
+                tatBreach,
+                tatOnTime,
+                ofdAgeingDays,
+                isOfdAgeing,
+                isTerminal,
+                lifecycleBreach,
+                isDelayed,
+                isInFailureBucket,
+                failureReasons,
+                slaStatus,
+                terminalStatus,
+                isDeliveredSuccess,
+                isDeliveredLate,
             };
         }
 
@@ -1293,10 +2461,56 @@
         }
 
         /**
+         * Lane SLA lookup: origin_city × destination_city → expected days.
+         *
+         * IMPORTANT: When an EDD is present we derive lane SLA from:
+         *   tat_expected = max(EDD.date - pickup.date, 0)
+         * so that anything delivered on/before EDD is not TAT‑breached.
+         * Only when EDD is missing do we fall back to a coarse lane table.
+         */
+        const LANE_SLA_DEFAULT_DAYS = 7; // conservative default so we don't over‑flag breaches
+        const LANE_SLA_TABLE = {
+            // Example overrides (can be tuned per business requirements):
+            // 'bengaluru|bengaluru': 1,
+            // 'bengaluru|hyderabad': 2,
+            // 'delhi|mumbai': 2,
+        };
+
+        function laneSlaDays(originCity, destinationCity, pickupDate, eddDate) {
+            // If we have both pickup and EDD, use them to derive SLA so EDD drives expectations.
+            if (pickupDate && eddDate) {
+                const pd = new Date(pickupDate.getTime());
+                pd.setHours(0, 0, 0, 0);
+                const ed = new Date(eddDate.getTime());
+                ed.setHours(0, 0, 0, 0);
+                const diffDays = Math.max(0, Math.floor((ed - pd) / (1000 * 60 * 60 * 24)));
+                // Minimum 1 day if diff is zero, so same‑day EDD is treated as 1‑day SLA
+                return diffDays || 1;
+            }
+
+            const key = `${String(originCity || '').toLowerCase()}|${String(destinationCity || '').toLowerCase()}`;
+            return LANE_SLA_TABLE[key] ?? LANE_SLA_DEFAULT_DAYS;
+        }
+
+        /**
          * Normalize status codes to internal categories
          */
         function normalizeStatusCode(code) {
             const c = (code || '').toUpperCase();
+            // Already-normalized values (common when importing from Excel exports)
+            // IMPORTANT: do NOT treat "DDL" as a final code here; we want to
+            // normalize it to "DELIVERED" below so all delivered logic is consistent.
+            if (['DELIVERED', 'OFD', 'INTRANSIT', 'RTO', 'NDR', 'CANCELLED', 'LOST', 'UD', 'SAL', 'DAMAGED', 'OTHER'].includes(c)) return c;
+
+            // Common description words
+            if (c.includes('DELIVERED')) return 'DELIVERED';
+            if (c.includes('OUT') && c.includes('DELIVERY')) return 'OFD';
+            if (c.includes('IN') && c.includes('TRANSIT')) return 'INTRANSIT';
+            if (c.includes('CANCEL')) return 'CANCELLED';
+            if (c.includes('LOST')) return 'LOST';
+            if (c.includes('RTO') || c.includes('RETURN')) return 'RTO';
+            if (c.includes('NDR') || c.includes('UNDELIVER')) return 'NDR';
+
             if (c === 'DDL') return 'DELIVERED';
             if (c === 'OFD' || c === 'DDS') return 'OFD';
             if (['MAN', 'PKD', 'IND', 'BGD', 'DPD', 'ARD', 'RDC', 'DBG'].includes(c)) return 'INTRANSIT';
@@ -1410,8 +2624,17 @@
                     // Only delayed shipments (negative delay days)
                     if (!s.isDelayed) return false;
                 } else if (statusFilter !== 'ALL') {
-                    // Normal status filter
-                    if (s.statusCode !== statusFilter) return false;
+                    // Normal status filter (with special handling for Delivered)
+                    if (statusFilter === 'DELIVERED') {
+                        const ts = s.terminalStatus ? String(s.terminalStatus).toLowerCase() : '';
+                        if (ts) {
+                            if (ts !== 'delivered') return false;
+                        } else if (s.statusCode !== 'DELIVERED') {
+                            return false;
+                        }
+                    } else {
+                        if (s.statusCode !== statusFilter) return false;
+                    }
                 }
                 
                 // Origin filter
@@ -1441,23 +2664,17 @@
                 return true;
             });
 
-            // Sort: Failures first, then by delay (most delayed first), then by date
+            // Sort by AWB in numeric series (no delay-based sorting)
             State.filteredShipments.sort((a, b) => {
-                // Failures first
-                if (a.isInFailureBucket && !b.isInFailureBucket) return -1;
-                if (!a.isInFailureBucket && b.isInFailureBucket) return 1;
-                
-                // Then by delay (most negative/delayed first)
-                if (a.delayedDays !== null && b.delayedDays !== null) {
-                    if (a.delayedDays !== b.delayedDays) {
-                        return a.delayedDays - b.delayedDays;
-                    }
+                const aNum = parseInt(a.awb, 10);
+                const bNum = parseInt(b.awb, 10);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return aNum - bNum;
                 }
-                
-                // Then by date (most recent first)
-                const dateA = parseShipmentDate(a.lastUpdate);
-                const dateB = parseShipmentDate(b.lastUpdate);
-                return dateB - dateA;
+
+                // Fallback to string compare if not purely numeric
+                return String(a.awb).localeCompare(String(b.awb));
             });
 
             State.currentPage = 1;
@@ -1545,16 +2762,59 @@
         function renderKPIs() {
             const data = State.filteredShipments;
             const total = data.length;
-            const delivered = data.filter(s => s.statusCode === 'DELIVERED').length;
+            // Helper: Delivered = explicit delivered terminal status,
+            // or (only when terminalStatus is absent) a DELIVERED status code.
+            const isDeliveredRow = (s) => {
+                const ts = s.terminalStatus ? String(s.terminalStatus).toLowerCase() : '';
+                if (ts) {
+                    // If we know the terminal_status, trust it and ONLY count true "delivered"
+                    return ts === 'delivered';
+                }
+                // Fallback when terminal_status is not provided
+                return s.statusCode === 'DELIVERED';
+            };
+
+            // Helper: business on-time rule
+            // - Must be delivered
+            // - If we have delivery + EDD dates: on-time when deliveryDate <= eddDate
+            //   (earlier deliveries also on time)
+            // - If EDD is missing but delayedDays is available: delayedDays >= 0 means on-time
+            // - If neither is available, treat delivered as on-time (we can't prove it's late)
+            const isOnTimeDelivery = (s) => {
+                if (!isDeliveredRow(s)) return false;
+
+                const deliveredAt = s.deliveredAt;
+                const eddDate = s.eddDate || (s.edd ? parseApiDate(s.edd) : null);
+
+                if (deliveredAt && eddDate) {
+                    const d = new Date(deliveredAt);
+                    d.setHours(0, 0, 0, 0);
+                    const e = new Date(eddDate);
+                    e.setHours(0, 0, 0, 0);
+                    // On-time if delivered on or before EDD; earlier deliveries are also on time
+                    return d.getTime() <= e.getTime();
+                }
+
+                if (s.delayedDays !== null && s.delayedDays !== undefined) {
+                    return s.delayedDays >= 0;
+                }
+
+                // No EDD / delay info: count delivered as on-time by default
+                return true;
+            };
+
+            const delivered = data.filter(isDeliveredRow).length;
             const inTransit = data.filter(s => ['INTRANSIT', 'OFD'].includes(s.statusCode)).length;
             const exceptions = data.filter(s => ['RTO', 'NDR', 'CANCELLED'].includes(s.statusCode)).length;
             const codValue = data.filter(s => s.type === 'COD').reduce((sum, s) => sum + (s.value || 0), 0);
             
-            // SLA Metrics
-            const onTimeDeliveries = data.filter(s => s.statusCode === 'DELIVERED' && !s.isDelayed).length;
+            // SLA Metrics:
+            // - Delivered counter: all delivered shipments, regardless of SLA
+            // - On-time SLA: apply business rule above
+            const onTimeDeliveries = data.filter(isOnTimeDelivery).length;
             const onTimeRate = delivered > 0 ? Math.round((onTimeDeliveries / delivered) * 100) : 0;
-            const delayedCount = data.filter(s => s.isDelayed).length;
-            const breachCount = data.filter(s => s.lifecycleBreach).length;
+            const delayedCount = delivered - onTimeDeliveries;
+            const breachCount = 0; // breach logic disabled for now
             
             // Calculate average delay (only for delayed shipments)
             const delayedShipments = data.filter(s => s.delayedDays !== null && s.delayedDays < 0);
@@ -1583,6 +2843,7 @@
             } else {
                 badge.classList.add('hidden');
             }
+
         }
 
         // =====================================================
@@ -1671,6 +2932,8 @@
             subtitle.textContent = `${data.length} shipment${data.length !== 1 ? 's' : ''} tracked`;
         }
 
+        // Charts removed per latest requirement; KPIs and table remain active.
+
         /**
          * Get row class based on lifecycle status
          */
@@ -1730,38 +2993,20 @@
          * Format SLA status badge
          */
         function formatSlaStatus(shipment) {
-            const { slaStatus, lifecycleBreach, failureReasons } = shipment;
-            
-            if (lifecycleBreach) {
-                return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold sla-critical" title="Lifecycle Breach: >15 days without terminal status">
-                    <iconify-icon icon="solar:danger-triangle-linear" width="10"></iconify-icon>
-                    BREACH
+            const { terminalStatus } = shipment;
+            const isDelivered = terminalStatus && String(terminalStatus).toLowerCase() === 'delivered';
+
+            if (isDelivered) {
+                return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold sla-ontime">
+                    <iconify-icon icon="solar:verified-check-linear" width="10"></iconify-icon>
+                    Delivered
                 </span>`;
             }
-            
-            switch(slaStatus) {
-                case 'ONTIME':
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold sla-ontime">
-                        <iconify-icon icon="solar:verified-check-linear" width="10"></iconify-icon>
-                        On-Time
-                    </span>`;
-                case 'DELAYED':
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold sla-delayed">
-                        <iconify-icon icon="solar:clock-circle-linear" width="10"></iconify-icon>
-                        Delayed
-                    </span>`;
-                case 'FAILED':
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold sla-delayed" title="${failureReasons?.join(', ') || 'Failed'}">
-                        <iconify-icon icon="solar:close-circle-linear" width="10"></iconify-icon>
-                        Failed
-                    </span>`;
-                case 'PENDING':
-                default:
-                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
-                        <iconify-icon icon="solar:hourglass-linear" width="10"></iconify-icon>
-                        Pending
-                    </span>`;
-            }
+
+            return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                <iconify-icon icon="solar:hourglass-linear" width="10"></iconify-icon>
+                Pending
+            </span>`;
         }
 
         function getRowClass(statusCode) {
