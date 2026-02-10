@@ -1630,7 +1630,8 @@
 
                 // Render & cache (best-effort)
                 updateFilterDropdowns();
-                applyFiltersAndRender();
+                // Auto-reset all filters (same as pressing the Reset button)
+                clearFilters();
                 updateFailureBucketAlert();
 
                 // Best-effort cache: may exceed quota for 20k rows; we keep UI working even if cache fails
@@ -3071,7 +3072,6 @@
                     </td>
                     <td class="py-3 px-4">
                         <div class="text-xs font-medium text-slate-900 truncate max-w-[150px]" title="${escapeHtml(s.customer)}">${escapeHtml(s.customer)}</div>
-                        ${s.currentLocation ? `<div class="text-[10px] text-slate-400">@ ${escapeHtml(s.currentLocation)}</div>` : ''}
                     </td>
                     <td class="py-3 px-4 text-xs text-slate-900 font-medium">${dcDisplay}</td>
                     <td class="py-3 px-4 text-xs text-slate-600">
