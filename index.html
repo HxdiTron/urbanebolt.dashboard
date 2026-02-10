@@ -314,6 +314,46 @@
                         <span class="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1.5"></span>
                         RTO
                     </button>
+
+                    <!-- Divider -->
+                    <span class="h-5 w-px bg-slate-200 mx-2 hidden sm:inline-block"></span>
+
+                    <!-- Type quick chips -->
+                    <div class="flex flex-wrap items-center gap-1">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mr-1">Type</span>
+                        <button onclick="setTypeQuickFilter('ALL')" data-type="ALL" class="status-chip type-chip active px-2.5 py-1 text-[11px] font-medium rounded-full transition-all">
+                            All
+                        </button>
+                        <button onclick="setTypeQuickFilter('COD')" data-type="COD" class="status-chip type-chip px-2.5 py-1 text-[11px] font-medium rounded-full transition-all">
+                            COD
+                        </button>
+                        <button onclick="setTypeQuickFilter('PPD')" data-type="PPD" class="status-chip type-chip px-2.5 py-1 text-[11px] font-medium rounded-full transition-all">
+                            PPD
+                        </button>
+                    </div>
+
+                    <!-- Customer quick filter -->
+                    <div class="flex items-center gap-1 ml-2">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Customer</span>
+                        <input
+                            id="quickCustomerFilter"
+                            type="text"
+                            placeholder="Name"
+                            oninput="onQuickCustomerFilterChange()"
+                            class="text-[11px] px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-w-[120px]"
+                        />
+                    </div>
+
+                    <!-- Date quick filter -->
+                    <div class="flex items-center gap-1 ml-2">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date</span>
+                        <input
+                            id="quickDateFilter"
+                            type="date"
+                            onchange="onQuickDateFilterChange()"
+                            class="text-[11px] px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
                 </div>
 
                 <!-- Advanced Filters Row -->
@@ -540,7 +580,8 @@
                             <tr>
                                 <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">AWB Number</th>
                                 <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
-                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Route</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">DC / Hub</th>
+                                <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Pickup Date</th>
                                 <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                                 <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">EDD</th>
                                 <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
@@ -556,7 +597,7 @@
                         </thead>
                         <tbody id="resultsTable" class="divide-y divide-slate-100 text-sm">
                             <tr>
-                                <td colspan="8" class="py-16 text-center">
+                                <td colspan="10" class="py-16 text-center">
                                     <div class="flex flex-col items-center">
                                         <iconify-icon icon="solar:magnifer-linear" width="48" class="text-slate-300 mb-3"></iconify-icon>
                                         <p class="text-slate-500 font-medium">No shipments tracked yet</p>
@@ -2615,6 +2656,19 @@
             document.getElementById('destinationFilter').value = 'ALL';
             const tableSearch = document.getElementById('tableSearchInput');
             if (tableSearch) tableSearch.value = '';
+            const quickCustomer = document.getElementById('quickCustomerFilter');
+            if (quickCustomer) quickCustomer.value = '';
+            const quickDate = document.getElementById('quickDateFilter');
+            if (quickDate) quickDate.value = '';
+            
+            // Reset quick type chips
+            document.querySelectorAll('.type-chip').forEach(btn => {
+                if (btn.dataset.type === 'ALL') {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
             
             // Reset status chips
             setStatusFilter('ALL');
@@ -2633,6 +2687,39 @@
                 }
             });
             
+            applyFiltersAndRender();
+        }
+
+        function setTypeQuickFilter(type) {
+            const select = document.getElementById('typeFilter');
+            if (select) {
+                select.value = type;
+            }
+            document.querySelectorAll('.type-chip').forEach(btn => {
+                if (btn.dataset.type === type) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            applyFiltersAndRender();
+        }
+
+        function onQuickCustomerFilterChange() {
+            const quick = document.getElementById('quickCustomerFilter');
+            const tableSearch = document.getElementById('tableSearchInput');
+            if (quick && tableSearch) {
+                tableSearch.value = quick.value || '';
+            }
+            applyFiltersAndRender();
+        }
+
+        function onQuickDateFilterChange() {
+            const quick = document.getElementById('quickDateFilter');
+            const hidden = document.getElementById('dateFilter');
+            if (quick && hidden) {
+                hidden.value = quick.value || '';
+            }
             applyFiltersAndRender();
         }
 
@@ -2690,6 +2777,7 @@
             const destinationFilter = document.getElementById('destinationFilter').value;
             const tableSearch = document.getElementById('tableSearchInput');
             const searchTerm = tableSearch ? tableSearch.value.toLowerCase().trim() : '';
+            const dateFilter = document.getElementById('dateFilter').value;
 
             State.filteredShipments = State.shipments.filter(s => {
                 // Type filter
@@ -2713,6 +2801,15 @@
                         }
                     } else {
                         if (s.statusCode !== statusFilter) return false;
+                    }
+                }
+                
+                // Date filter (by pickup/addedOn date)
+                if (dateFilter) {
+                    const pickup = parseApiDate(s.addedOn);
+                    const filterDate = parseApiDate(dateFilter);
+                    if (!pickup || !filterDate || pickup.getTime() !== filterDate.getTime()) {
+                        return false;
                     }
                 }
                 
@@ -2937,7 +3034,7 @@
             if (data.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="py-16 text-center">
+                        <td colspan="10" class="py-16 text-center">
                             <div class="flex flex-col items-center">
                                 <iconify-icon icon="solar:magnifer-linear" width="48" class="text-slate-300 mb-3"></iconify-icon>
                                 <p class="text-slate-500 font-medium">${State.shipments.length === 0 ? 'No shipments tracked yet' : 'No shipments match filters'}</p>
@@ -2963,6 +3060,8 @@
                 const delayDisplay = formatDelayDays(s.delayedDays);
                 const slaDisplay = formatSlaStatus(s);
                 const eddDisplay = formatEdd(s.edd);
+                const dcDisplay = s.currentLocation ? escapeHtml(s.currentLocation) : '--';
+                const pickupDisplay = s.addedOn ? escapeHtml(s.addedOn) : '';
                 
                 return `
                 <tr class="${rowClass} hover:bg-slate-50/50 cursor-pointer transition-colors" onclick="viewShipment('${escapeHtml(s.awb)}')">
@@ -2974,10 +3073,9 @@
                         <div class="text-xs font-medium text-slate-900 truncate max-w-[150px]" title="${escapeHtml(s.customer)}">${escapeHtml(s.customer)}</div>
                         ${s.currentLocation ? `<div class="text-[10px] text-slate-400">@ ${escapeHtml(s.currentLocation)}</div>` : ''}
                     </td>
-                    <td class="py-3 px-4 text-xs">
-                        <span class="text-slate-500">${escapeHtml(s.origin)}</span>
-                        <iconify-icon icon="solar:arrow-right-linear" width="10" class="mx-0.5 text-slate-300"></iconify-icon>
-                        <span class="text-slate-900 font-medium">${escapeHtml(s.destination)}</span>
+                    <td class="py-3 px-4 text-xs text-slate-900 font-medium">${dcDisplay}</td>
+                    <td class="py-3 px-4 text-xs text-slate-600">
+                        ${pickupDisplay || '<span class="text-slate-400">--</span>'}
                     </td>
                     <td class="py-3 px-4">
                         <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusClass}">${escapeHtml(s.status)}</span>
