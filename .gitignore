@@ -2,5 +2,4 @@
 .env*
 node_modules/
 
-# IMPORTANT: Never commit actual API configuration
-config.js
+# config.js is committed (safe defaults). Override via localStorage.urbanebolt_api_base
