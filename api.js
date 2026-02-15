@@ -542,13 +542,14 @@ const API = (() => {
             ? `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments?limit=${limit}&after=${encodeURIComponent(after)}`
             : `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments?limit=${limit}`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        const timeoutMs = 28000;
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         let response;
         try {
             response = await fetch(url, { signal: controller.signal });
         } catch (e) {
             clearTimeout(timeoutId);
-            if (e && e.name === 'AbortError') throw new Error('Shipments request timed out (120s). Try a smaller chunk or check the server.');
+            if (e && e.name === 'AbortError') throw new Error('Shipments request timed out. Server may have a short timeout (e.g. Vercel 10–60s). Try loading again or use a smaller chunk.');
             throw e;
         }
         clearTimeout(timeoutId);

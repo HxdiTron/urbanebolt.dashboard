@@ -983,7 +983,7 @@
 
             try {
                 const data = await API.getAllShipmentsFromMongo({
-                    chunkSize: 100000,
+                    chunkSize: 5000,
                     onProgress: function (loaded, total) {
                         const msg = total ? `Loading shipments... ${loaded.toLocaleString()} / ${total.toLocaleString()}` : `Loading shipments... ${loaded.toLocaleString()}`;
                         showTableLoading(msg);
@@ -1071,9 +1071,9 @@
             if (typeof API === 'undefined' || !API.getDashboardSummary) return false;
             const config = API.getConfig && API.getConfig();
             if (!config || !config.baseUrl) return false;
-            const el = (id) => document.getElementById(id);
+            const getKpiEl = (id) => document.getElementById(id);
             try {
-                if (el('kpi-dsr')) el('kpi-dsr').textContent = '...';
+                if (getKpiEl('kpi-dsr')) getKpiEl('kpi-dsr').textContent = '...';
                 const s = await API.getDashboardSummary();
                 const totalShipments = Number(s.totalShipments) || 0;
                 const slaPercentage = Number(s.slaPercentage) || 0;
@@ -1082,20 +1082,19 @@
                 const revenueAtRisk = Number(s.revenueAtRisk) || 0;
                 const rtoPercentage = Number(s.rtoPercentage) || 0;
 
-                const el = (id) => document.getElementById(id);
-                if (el('kpi-total')) el('kpi-total').textContent = totalShipments.toLocaleString();
-                if (el('kpi-dsr')) el('kpi-dsr').textContent = slaPercentage + '%';
-                if (el('kpi-delayed')) el('kpi-delayed').textContent = openBreachCount.toLocaleString();
-                if (el('kpi-breach')) el('kpi-breach').textContent = breachCount.toLocaleString();
-                if (el('kpi-cod')) el('kpi-cod').textContent = '₹' + revenueAtRisk.toLocaleString('en-IN');
-                if (el('kpi-avgdelay')) el('kpi-avgdelay').textContent = rtoPercentage + '% RTO';
+                if (getKpiEl('kpi-total')) getKpiEl('kpi-total').textContent = totalShipments.toLocaleString();
+                if (getKpiEl('kpi-dsr')) getKpiEl('kpi-dsr').textContent = slaPercentage + '%';
+                if (getKpiEl('kpi-delayed')) getKpiEl('kpi-delayed').textContent = openBreachCount.toLocaleString();
+                if (getKpiEl('kpi-breach')) getKpiEl('kpi-breach').textContent = breachCount.toLocaleString();
+                if (getKpiEl('kpi-cod')) getKpiEl('kpi-cod').textContent = '₹' + revenueAtRisk.toLocaleString('en-IN');
+                if (getKpiEl('kpi-avgdelay')) getKpiEl('kpi-avgdelay').textContent = rtoPercentage + '% RTO';
 
-                if (typeof Chart !== 'undefined' && el('summaryChartCanvas')) {
+                if (typeof Chart !== 'undefined' && getKpiEl('summaryChartCanvas')) {
                     const other = Math.max(0, totalShipments - openBreachCount - breachCount);
-                    const legendEl = el('summaryChartLegend');
+                    const legendEl = getKpiEl('summaryChartLegend');
                     if (legendEl) legendEl.textContent = totalShipments + ' total • ' + slaPercentage + '% on-time • ₹' + revenueAtRisk.toLocaleString('en-IN') + ' at risk';
                     if (window._summaryChart) window._summaryChart.destroy();
-                    window._summaryChart = new Chart(el('summaryChartCanvas'), {
+                    window._summaryChart = new Chart(getKpiEl('summaryChartCanvas'), {
                         type: 'doughnut',
                         data: {
                             labels: ['Open breach', 'Breach (late)', 'On time / In progress'],
