@@ -421,6 +421,33 @@ const API = (() => {
                 };
             });
         },
+
+        /**
+         * Pull POD image URLs from the tracking API in batches of 20.
+         * @param {string[]} awbList - Array of AWB numbers
+         * @returns {Promise<Object>} Map of awb -> podUrl (only AWBs that have a POD in the API response)
+         */
+        async getPodUrlsFromTracking(awbList) {
+            if (!Array.isArray(awbList)) return {};
+            const sanitized = [...new Set(awbList
+                .filter(awb => awb && typeof awb === 'string')
+                .map(awb => String(awb).replace(/[^a-zA-Z0-9]/g, ''))
+                .filter(awb => awb.length > 0))];
+            if (sanitized.length === 0) return {};
+            const BATCH = 20;
+            const out = {};
+            for (let i = 0; i < sanitized.length; i += BATCH) {
+                const batch = sanitized.slice(i, i + BATCH);
+                const results = await this.getMultiple(batch);
+                results.forEach((r) => {
+                    if (r.success && r.data) {
+                        const pod = r.data.delPod || r.data.pod_url || r.data.podUrl || r.data.proof_of_delivery_url || r.data.pod_image_url || r.data.delivery_proof_url || '';
+                        if (pod && String(pod).trim()) out[r.awb] = String(pod).trim();
+                    }
+                });
+            }
+            return out;
+        },
     };
 
     // =========================================================
@@ -448,6 +475,182 @@ const API = (() => {
     }
 
     // =========================================================
+    // UPLOAD EXCEL (multipart/form-data to backend)
+    // =========================================================
+    // Example: <input type="file" id="excel" accept=".xlsx,.xls" />
+    //          document.getElementById('excel').addEventListener('change', async (e) => {
+    //              const file = e.target.files[0]; if (!file) return;
+    //              const res = await API.uploadExcel(file);
+    //              console.log(res); // { insertedCount, modifiedCount, totalRows, batchId }
+    //          });
+    async function uploadExcel(file) {
+        if (!CONFIG.baseUrl) {
+            throw new Error('API not configured. Call API.configure({ baseUrl: "..." }) first.');
+        }
+        if (!file || (typeof File !== 'undefined' && !(file instanceof File))) {
+            throw new Error('uploadExcel requires a File object');
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        const url = `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/upload`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min for large files
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal,
+                headers: {},
+            });
+            clearTimeout(timeoutId);
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (_) {
+                const preview = (text && text.trim()) ? text.trim().slice(0, 150) : '(empty response)';
+                const hint = response.status === 404
+                    ? 'Upload endpoint not found (404). Use the correct API base URL and ensure the server is running.'
+                    : 'Server returned non-JSON. Response: ' + preview;
+                const err = new Error(hint);
+                err.status = response.status;
+                throw err;
+            }
+            if (!response.ok) {
+                const message = data.detail || data.error || `HTTP ${response.status}`;
+                const err = new Error(message);
+                err.status = response.status;
+                err.detail = data.detail;
+                throw err;
+            }
+            return data;
+        } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') throw new Error('Upload timeout');
+            throw err;
+        }
+    }
+
+    async function getShipmentsFromMongo(options) {
+        options = options || {};
+        if (!CONFIG.baseUrl) {
+            throw new Error('API not configured. Call API.configure({ baseUrl: "..." }) first.');
+        }
+        const limit = Math.min(200000, Math.max(1, Math.floor(Number(options.limit)) || 10000));
+        const after = options.after && String(options.after).trim() ? String(options.after).trim() : '';
+        const url = after
+            ? `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments?limit=${limit}&after=${encodeURIComponent(after)}`
+            : `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments?limit=${limit}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        let response;
+        try {
+            response = await fetch(url, { signal: controller.signal });
+        } catch (e) {
+            clearTimeout(timeoutId);
+            if (e && e.name === 'AbortError') throw new Error('Shipments request timed out (120s). Try a smaller chunk or check the server.');
+            throw e;
+        }
+        clearTimeout(timeoutId);
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (_) {
+            const msg = response.status === 404 ? 'Shipments endpoint not found (404).' : 'Server returned non-JSON: ' + (text.trim().slice(0, 100) || '(empty)');
+            const err = new Error(msg);
+            err.status = response.status;
+            throw err;
+        }
+        if (!response.ok) {
+            const message = data.detail || data.error || `HTTP ${response.status}`;
+            const err = new Error(message);
+            err.status = response.status;
+            err.detail = data.detail;
+            throw err;
+        }
+        return data;
+    }
+
+    /**
+     * Fetch ALL shipments using cursor-based pagination (no large skip).
+     * Calls onProgress(loaded, total) after each chunk. total from first response.
+     */
+    async function getAllShipmentsFromMongo(options) {
+        options = options || {};
+        const CHUNK = Math.min(20000, Math.max(5000, Math.floor(Number(options.chunkSize)) || 10000));
+        const onProgress = typeof options.onProgress === 'function' ? options.onProgress : function () {};
+
+        if (!CONFIG.baseUrl) {
+            throw new Error('API not configured. Call API.configure({ baseUrl: "..." }) first.');
+        }
+
+        const all = [];
+        let total = 0;
+        let nextAfter = null;
+
+        while (true) {
+            const data = await getShipmentsFromMongo(nextAfter ? { limit: CHUNK, after: nextAfter } : { limit: CHUNK });
+            const list = data.shipments || [];
+            if (data.total != null && total === 0) total = Math.max(0, Math.floor(Number(data.total)));
+            for (let i = 0; i < list.length; i++) all.push(list[i]);
+            onProgress(all.length, total || all.length);
+            nextAfter = data.nextAfter && String(data.nextAfter).trim() ? String(data.nextAfter).trim() : null;
+            if (list.length < CHUNK || !nextAfter) break;
+        }
+
+        return { shipments: all, total: total || all.length };
+    }
+
+    async function getShipmentByAwbFromMongo(awb) {
+        if (!CONFIG.baseUrl) {
+            throw new Error('API not configured. Call API.configure({ baseUrl: "..." }) first.');
+        }
+        const sanitized = String(awb || '').replace(/[^a-zA-Z0-9]/g, '');
+        if (!sanitized) return null;
+        const url = `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments/${encodeURIComponent(sanitized)}`;
+        try {
+            const response = await fetch(url);
+            if (response.status === 404) return null;
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (_) {
+                return null;
+            }
+            if (!response.ok) return null;
+            return data;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function getDashboardSummary() {
+        if (!CONFIG.baseUrl) {
+            throw new Error('API not configured. Call API.configure({ baseUrl: "..." }) first.');
+        }
+        const url = `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/summary`;
+        const response = await fetch(url);
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (_) {
+            const err = new Error(response.status === 404 ? 'Summary endpoint not found (404).' : 'Server returned non-JSON: ' + (text.trim().slice(0, 80) || '(empty)'));
+            err.status = response.status;
+            throw err;
+        }
+        if (!response.ok) {
+            const err = new Error(data.detail || data.error || 'HTTP ' + response.status);
+            err.status = response.status;
+            err.detail = data.detail;
+            throw err;
+        }
+        return data;
+    }
+
+    // =========================================================
     // PUBLIC API
     // =========================================================
     return Object.freeze({
@@ -456,6 +659,11 @@ const API = (() => {
         tracking,
         request: deduplicatedRequest,
         batchFetch,
+        uploadExcel,
+        getShipmentsFromMongo,
+        getAllShipmentsFromMongo,
+        getShipmentByAwbFromMongo,
+        getDashboardSummary,
         getStatus,
         clearQueue,
         MAX_BATCH_SIZE: 20,

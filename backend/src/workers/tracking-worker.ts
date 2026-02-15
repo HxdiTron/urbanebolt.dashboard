@@ -267,8 +267,13 @@ async function processBatch(awbs: string[], batchId: string): Promise<{
 }
 
 // ============================================================
-// WORKER DEFINITION
+// WORKER DEFINITION (only created when Redis is configured)
 // ============================================================
+if (!redisConnection) {
+    throw new Error('Worker requires Redis. Set REDIS_URL or do not start the worker service.');
+}
+const connection = redisConnection;
+
 export const worker = new Worker<SyncJobData>(
     'tracking-sync',
     async (job: Job<SyncJobData>) => {
@@ -318,7 +323,7 @@ export const worker = new Worker<SyncJobData>(
         }
     },
     {
-        connection: redisConnection,
+        connection,
         concurrency: 5,
         limiter: {
             max: CONFIG.REQUESTS_PER_MINUTE,

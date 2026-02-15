@@ -4,13 +4,18 @@ dotenv.config();
 export const CONFIG = {
     // Database
     DATABASE_URL: process.env.DATABASE_URL || 'postgres://urbanebolt:localdev123@localhost:5432/urbanebolt',
+    MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017',
+    MONGODB_DB: process.env.MONGODB_DB || 'urbanebolt',
     
-    // Redis
-    REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+    // Redis (optional: leave unset or set REDIS_DISABLED=1 to run without Redis; queue/sync will be disabled)
+    REDIS_URL: process.env.REDIS_DISABLED ? '' : (process.env.REDIS_URL || ''),
     
     // API Server
     PORT: parseInt(process.env.PORT || '3000'),
     NODE_ENV: process.env.NODE_ENV || 'development',
+
+    // Proof of Delivery images: directory to serve at /delivery_pods (can be absolute path)
+    DELIVERY_PODS_PATH: process.env.DELIVERY_PODS_PATH || '',
     
     // Logging
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',

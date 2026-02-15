@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Excel → MongoDB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="api.js"></script>
+    <script src="config.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen p-8 font-sans">
+    <div class="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
+        <h1 class="text-xl font-bold text-slate-900 mb-2">Upload Excel to MongoDB</h1>
+        <p class="text-sm text-slate-500 mb-4">Uses POST /api/v1/upload. Backend parses, normalizes, computes SLA, upserts by AWB.</p>
+        <p class="text-xs text-slate-400 mb-2">Backend: <span id="backendUrl"></span> · <a href="#" id="checkConn" class="text-blue-600 hover:underline">Check connections</a></p>
+        <input type="file" id="file" accept=".xlsx,.xls,.csv" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-slate-100 file:text-slate-700 mb-4">
+        <button type="button" id="btn" class="w-full px-4 py-2.5 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 disabled:opacity-50">
+            Upload to MongoDB
+        </button>
+        <div id="result" class="mt-4 p-3 rounded-lg bg-slate-100 text-sm hidden"></div>
+    </div>
+    <script>
+        (function() {
+            // Force local backend when opening this page from same host (override config.js)
+            var base = window.URBANEBOLT_BACKEND_URL || window.location.origin;
+            if (typeof API !== 'undefined' && API.configure) API.configure({ baseUrl: base });
+            document.getElementById('backendUrl').textContent = base;
+
+            var fileInput = document.getElementById('file');
+            var btn = document.getElementById('btn');
+            var result = document.getElementById('result');
+
+            function show(msg, isError) {
+                result.textContent = msg;
+                result.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'bg-rose-100', 'text-rose-800');
+                result.classList.add(isError ? 'bg-rose-100' : 'bg-emerald-100', isError ? 'text-rose-800' : 'text-emerald-800');
+            }
+            function showSuccessWithLink(inserted, modified, totalRows) {
+                result.innerHTML = 'OK: inserted=' + inserted + ', modified=' + modified + ', totalRows=' + totalRows + '. <a href="index.html" class="underline font-medium">View dashboard</a>';
+                result.classList.remove('hidden', 'bg-rose-100', 'text-rose-800');
+                result.classList.add('bg-emerald-100', 'text-emerald-800');
+            }
+
+            btn.onclick = async function() {
+                var file = fileInput.files[0];
+                if (!file) { show('Please select a file.', true); return; }
+                btn.disabled = true;
+                show('Uploading...', false);
+                try {
+                    var res = await API.uploadExcel(file);
+                    showSuccessWithLink(res.insertedCount, res.modifiedCount, res.totalRows);
+                } catch (e) {
+                    var msg = e.message || String(e);
+                    if (e.detail && String(e.detail) !== msg) msg += ' — ' + e.detail;
+                    show('Error: ' + msg, true);
+                }
+                btn.disabled = false;
+            };
+
+            document.getElementById('checkConn').onclick = function(e) {
+                e.preventDefault();
+                fetch(base + '/api/v1/connections').then(function(r) { return r.json(); }).then(function(d) {
+                    var m = 'Mongo: ' + (d.mongo && d.mongo.ok ? 'OK' : (d.mongo && d.mongo.error) || 'fail');
+                    var p = 'Postgres: ' + (d.postgres && d.postgres.ok ? 'OK' : (d.postgres && d.postgres.error) || 'fail');
+                    show(m + ' · ' + p, !d.allConnected);
+                }).catch(function(err) {
+                    show('Connections check failed: ' + (err.message || err), true);
+                });
+            };
+        })();
+    </script>
+</body>
+</html>

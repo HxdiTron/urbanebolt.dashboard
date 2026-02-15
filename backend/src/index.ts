@@ -25,15 +25,24 @@ async function startServices() {
             logger.info('API server started');
         }
         
+        const redisEnabled = Boolean(CONFIG.REDIS_URL && CONFIG.REDIS_URL.trim());
         if (SERVICE === 'worker' || SERVICE === 'all') {
-            await import('./workers/tracking-worker');
-            logger.info('Sync worker started');
+            if (redisEnabled) {
+                await import('./workers/tracking-worker');
+                logger.info('Sync worker started');
+            } else {
+                logger.info('Sync worker skipped (Redis not configured)');
+            }
         }
         
         if (SERVICE === 'scheduler' || SERVICE === 'all') {
-            const scheduler = await import('./scheduler/sync-scheduler');
-            scheduler.startScheduler();
-            logger.info('Scheduler started');
+            if (redisEnabled) {
+                const scheduler = await import('./scheduler/sync-scheduler');
+                scheduler.startScheduler();
+                logger.info('Scheduler started');
+            } else {
+                logger.info('Scheduler skipped (Redis not configured)');
+            }
         }
         
         logger.info('All services started successfully');

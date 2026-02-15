@@ -136,6 +136,85 @@
             return div.innerHTML;
         }
 
+        /** Map status code to human-readable label (for badge and timeline) */
+        function statusCodeToDisplayName(code) {
+            const map = {
+                'DDL': 'Delivered', 'RTD': 'RTO Delivered', 'RTO': 'RTO Initiated', 'RTL': 'RTO Lock',
+                'UDD': 'Un-delivered', 'OFD': 'Out for Delivery', 'PKD': 'Picked up', 'MAN': 'Manifested',
+                'DDS': 'Out for Delivery', 'NDR': 'NDR', 'CAN': 'Cancelled', 'LOST': 'Lost'
+            };
+            return map[(code || '').toUpperCase()] || (code || 'Update');
+        }
+
+        /** Normalize header for matching (lowercase, no spaces/special chars) */
+        function normHeader(h) {
+            return String(h || '').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/gi, '');
+        }
+
+        /** Resolve POD URL from doc: first-class delPod, or from extra by header name (pod, delpod, podurl, etc.) */
+        function resolveDelPod(doc) {
+            if (doc.delPod && String(doc.delPod).trim()) return String(doc.delPod).trim();
+            const extra = doc.extra;
+            const headerNames = doc.headerNames;
+            if (!extra || !Array.isArray(headerNames)) return '';
+            const podKeys = ['delpod', 'pod', 'podurl', 'pod_url', 'proofofdelivery', 'deliveryproof', 'podimage', 'pod_image'];
+            for (let i = 0; i < headerNames.length; i++) {
+                const n = normHeader(headerNames[i]);
+                if (podKeys.some(k => n === k || n.includes(k))) {
+                    const v = extra['col_' + i];
+                    if (v != null && String(v).trim()) return String(v).trim();
+                }
+            }
+            return '';
+        }
+
+        /** Map MongoDB shipment doc (Excel upload) to tracking-API-like format for renderShipment */
+        function mongoDocToTrackingFormat(doc) {
+            const addedOn = doc.bookingDate || doc.uploadedAt || '';
+            const edd = doc.edd || '';
+            const lastUpdate = doc.deliveredOn || doc.uploadedAt || doc.bookingDate || '';
+            const deliveredOn = doc.deliveredOn || '';
+            const status = (doc.status || '').toUpperCase();
+            const isDelivered = !!deliveredOn || status === 'DDL' || status === 'DELIVERED' || status === 'RTD';
+            const isRto = Boolean(doc.isRTO);
+            const scans = Array.isArray(doc.scans) && doc.scans.length > 0
+                ? doc.scans.map(s => ({
+                    statusCode: s.statusCode || '',
+                    statusDateTime: s.statusDateTime || s.statusDate || '',
+                    statusDescription: s.statusDescription || s.statusCodeDescription || statusCodeToDisplayName(s.statusCode),
+                    currentLocation: s.currentLocation || s.location || '',
+                    reasonCodeDescription: s.reasonCodeDescription || s.reasonDescription || '',
+                }))
+                : [];
+            if (scans.length === 0) {
+                if (doc.bookingDate) scans.push({ statusCode: 'PKD', statusDateTime: doc.bookingDate, statusDescription: 'Picked up', currentLocation: doc.origin || '' });
+                if (deliveredOn) scans.push({ statusCode: isRto ? 'RTD' : 'DDL', statusDateTime: deliveredOn, statusDescription: isRto ? 'RTO Delivered' : 'Delivered', currentLocation: doc.destination || '' });
+            }
+            const currentStatusCode = isRto && isDelivered ? 'RTD' : isDelivered ? 'DDL' : (status || (isRto ? 'RTO' : ''));
+            const currentStatusCodeDescription = statusCodeToDisplayName(currentStatusCode);
+            return {
+                awbNumber: doc.awb,
+                shipperName: doc.customer || 'N/A',
+                origin: doc.origin || 'N/A',
+                destination: doc.destination || 'N/A',
+                currentLocation: doc.destination || (isRto ? 'RTO' : doc.origin) || '',
+                currentStatusCode: currentStatusCode,
+                currentStatusCodeDescription: currentStatusCodeDescription,
+                productType: 'PPD',
+                weight: doc.weight || 0,
+                pieces: doc.pieces || 1,
+                addedOn: addedOn,
+                edd: edd,
+                currentStatusDateTime: lastUpdate,
+                isRto: isRto,
+                orderNumber: doc.orderNumber || '',
+                currentReasonCode: doc.reasonCode || '',
+                currentReasonCodeDescription: doc.reasonDescription || '',
+                delPod: resolveDelPod(doc),
+                scans: scans,
+            };
+        }
+
         async function loadShipment() {
             const awb = document.getElementById('awbInput').value.trim();
             if (!awb) {
@@ -146,17 +225,40 @@
             document.getElementById('loadingIndicator').classList.remove('hidden');
             
             try {
-                const data = await API.tracking.getByAwb(awb);
-                
+                let data = null;
+                if (typeof API !== 'undefined' && API.getShipmentByAwbFromMongo) {
+                    data = await API.getShipmentByAwbFromMongo(awb);
+                    if (data) data = mongoDocToTrackingFormat(data);
+                }
+                if (!data && typeof API !== 'undefined' && API.tracking && API.tracking.getByAwb) {
+                    try {
+                        data = await API.tracking.getByAwb(awb);
+                    } catch (e) {
+                        if (e.status !== 404) throw e;
+                    }
+                }
+                // Pull POD image URL from tracking API when missing or relative (so image loads from API)
+                if (data && typeof API !== 'undefined' && API.tracking && API.tracking.getByAwb) {
+                    const pod = (data.delPod || data.podUrl || '').trim();
+                    if (!pod || pod.startsWith('/')) {
+                        try {
+                            const trackingData = await API.tracking.getByAwb(awb);
+                            if (trackingData) {
+                                const apiPod = (trackingData.delPod || trackingData.pod_url || trackingData.podUrl || trackingData.proof_of_delivery_url || '').trim();
+                                if (apiPod) data.delPod = apiPod;
+                            }
+                        } catch (_) { /* ignore */ }
+                    }
+                }
                 if (data) {
                     renderShipment(data);
-                    // Update URL without reload
                     history.replaceState(null, '', `?awb=${encodeURIComponent(awb)}`);
                 } else {
                     document.getElementById('shipmentContent').innerHTML = `
                         <div class="bg-white rounded-xl premium-border premium-shadow p-12 text-center">
                             <iconify-icon icon="solar:close-circle-linear" width="48" class="text-rose-300 mb-4"></iconify-icon>
                             <p class="text-slate-500">No shipment found for AWB: <span class="font-mono font-semibold">${escapeHtml(awb)}</span></p>
+                            <p class="text-slate-400 text-xs mt-2">Not in dashboard data or tracking API</p>
                         </div>
                     `;
                 }
@@ -212,7 +314,7 @@
          */
         function calculateLifecycle(data, statusCode) {
             const LIFECYCLE_LIMIT_DAYS = 15;
-            const TERMINAL_STATUSES = ['DDL', 'RTO', 'CAN', 'LOST'];
+            const TERMINAL_STATUSES = ['DDL', 'RTD', 'RTO', 'CAN', 'LOST'];
             
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -221,8 +323,8 @@
             const eddDate = parseApiDate(data.edd);
             
             let deliveredAt = null;
-            if (statusCode === 'DDL' && data.scans && data.scans.length > 0) {
-                const deliveryScan = data.scans.find(s => s.statusCode === 'DDL');
+            if ((statusCode === 'DDL' || statusCode === 'RTD') && data.scans && data.scans.length > 0) {
+                const deliveryScan = data.scans.find(s => s.statusCode === 'DDL' || s.statusCode === 'RTD');
                 if (deliveryScan) deliveredAt = parseApiDate(deliveryScan.statusDateTime);
             }
             
@@ -244,7 +346,7 @@
             const isDelayed = delayedDays !== null && delayedDays < 0;
             
             let slaStatus = 'PENDING';
-            if (statusCode === 'DDL') {
+            if (statusCode === 'DDL' || statusCode === 'RTD') {
                 slaStatus = isDelayed ? 'DELAYED' : 'ONTIME';
             } else if (lifecycleBreach) {
                 slaStatus = 'BREACH';
@@ -262,9 +364,23 @@
         /**
          * Render shipment details from API response
          */
+        /** Resolve POD URL: relative paths (e.g. /delivery_pods/...) must be requested from the API origin so the backend can serve them */
+        function resolvePodUrl(url) {
+            const u = (url || '').trim();
+            if (!u) return '';
+            if (u.startsWith('http://') || u.startsWith('https://')) return u;
+            if (u.startsWith('/')) {
+                const base = (typeof API !== 'undefined' && API.getConfig && API.getConfig().baseUrl) ? API.getConfig().baseUrl : window.location.origin;
+                return (base || '').replace(/\/$/, '') + u;
+            }
+            return u;
+        }
+
         function renderShipment(data) {
             const statusCode = data.currentStatusCode || '';
             const lifecycle = calculateLifecycle(data, statusCode);
+            const rawPod = (data.delPod || data.podUrl || data.pod_url || data.proofOfDelivery || '').trim();
+            const delPod = resolvePodUrl(rawPod);
             
             const shipment = {
                 awb: String(data.awbNumber || ''),
@@ -283,7 +399,7 @@
                 lastUpdate: data.currentStatusDateTime || 'N/A',
                 isRto: data.isRto || false,
                 rtoStatus: data.rto_status || 0,
-                delPod: data.delPod || '',
+                delPod: delPod,
                 reasonCode: data.currentReasonCode || '',
                 reasonDescription: data.currentReasonCodeDescription || '',
                 scans: data.scans || [],
@@ -312,8 +428,7 @@
                                     ${shipment.orderNumber ? `<p class="text-xs text-slate-500 mt-1">Order: #${escapeHtml(shipment.orderNumber)}</p>` : ''}
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusClass(shipment.statusCode)}">${escapeHtml(shipment.status)}</span>
-                                    ${shipment.isRto ? '<span class="px-2 py-1 rounded-full text-[10px] font-semibold bg-rose-100 text-rose-700">RTO</span>' : ''}
+                                    <span class="px-3 py-1.5 rounded-full text-xs font-semibold ${getStatusClass(shipment.statusCode)}">${escapeHtml(shipment.status || statusCodeToDisplayName(shipment.statusCode))}</span>
                                 </div>
                             </div>
                             
@@ -353,10 +468,12 @@
                             </div>
                         </div>
                         
-                        <!-- Timeline -->
+                        <!-- Tracking History (detailed shipment timeline) -->
                         <div class="bg-white rounded-xl premium-border premium-shadow p-6">
-                            <h3 class="text-sm font-bold text-slate-900 mb-4">Tracking History (${shipment.scans.length} events)</h3>
-                            <div id="timeline" class="space-y-4 max-h-96 overflow-y-auto">
+                            <h3 class="text-base font-bold text-slate-900 mb-1">Tracking History</h3>
+                            <p class="text-xs text-slate-500 mb-4">${shipment.scans.length} event${shipment.scans.length !== 1 ? 's' : ''}</p>
+                            ${shipment.scans.length > 8 ? '<p class="text-[10px] text-slate-400 mb-2">Scroll to see all events</p>' : ''}
+                            <div id="timeline" class="space-y-4 max-h-[32rem] overflow-y-auto pr-1">
                                 ${renderTimeline(shipment.scans)}
                             </div>
                         </div>
@@ -364,30 +481,28 @@
                     
                     <!-- Sidebar -->
                     <div class="space-y-6">
-                        <!-- SLA Status Card -->
+                        <!-- SLA Status Card (match reference: BREACH badge, Delay box, Shipment Age, Lifecycle Breach) -->
                         <div class="bg-white rounded-xl premium-border premium-shadow p-6 ${shipment.lifecycleBreach ? 'ring-2 ring-orange-400' : shipment.isDelayed ? 'ring-2 ring-rose-400' : ''}">
                             <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
                                 SLA Status
-                                ${shipment.lifecycleBreach ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 animate-pulse">BREACH</span>' : ''}
+                                ${shipment.slaStatus === 'BREACH' || shipment.lifecycleBreach ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700">BREACH</span>' : ''}
                             </h3>
                             <div class="space-y-4">
-                                <!-- Delay Indicator -->
-                                <div class="p-4 rounded-lg ${shipment.delayedDays !== null && shipment.delayedDays < 0 ? 'bg-rose-50 border border-rose-200' : shipment.delayedDays !== null && shipment.delayedDays >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200'}">
+                                <!-- Delay Status (large box, red when past EDD) -->
+                                <div class="p-4 rounded-lg ${shipment.delayedDays !== null && shipment.delayedDays < 0 ? 'bg-rose-100 border border-rose-300' : shipment.delayedDays !== null && shipment.delayedDays >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200'}">
                                     <p class="text-[10px] font-semibold text-slate-500 uppercase mb-1">Delay Status</p>
                                     ${shipment.delayedDays !== null ? `
                                         <p class="text-2xl font-bold ${shipment.delayedDays < 0 ? 'text-rose-600' : 'text-emerald-600'}">
                                             ${shipment.delayedDays < 0 ? shipment.delayedDays : '+' + shipment.delayedDays} days
                                         </p>
-                                        <p class="text-xs ${shipment.delayedDays < 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                                        <p class="text-xs font-medium ${shipment.delayedDays < 0 ? 'text-rose-600' : 'text-emerald-600'}">
                                             ${shipment.delayedDays < 0 ? 'Past EDD' : shipment.delayedDays === 0 ? 'On schedule' : 'Ahead of schedule'}
                                         </p>
-                                    ` : '<p class="text-lg font-semibold text-slate-400">-- days</p><p class="text-xs text-slate-400">No EDD available</p>'}
+                                    ` : '<p class="text-lg font-semibold text-slate-400">—</p><p class="text-xs text-slate-400">No EDD available</p>'}
                                 </div>
-                                
-                                <!-- Lifecycle -->
                                 <div class="flex items-center justify-between text-xs">
                                     <span class="text-slate-500">Shipment Age</span>
-                                    <span class="font-semibold ${shipment.shipmentAgeDays > 15 ? 'text-orange-600' : 'text-slate-900'}">${shipment.shipmentAgeDays} days</span>
+                                    <span class="font-semibold text-slate-900">${shipment.shipmentAgeDays != null ? shipment.shipmentAgeDays + ' days' : '—'}</span>
                                 </div>
                                 <div class="flex items-center justify-between text-xs">
                                     <span class="text-slate-500">SLA Status</span>
@@ -399,9 +514,8 @@
                                         'bg-slate-100 text-slate-600'
                                     }">${shipment.slaStatus}</span>
                                 </div>
-                                
                                 ${shipment.lifecycleBreach ? `
-                                <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg mt-2">
+                                <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg">
                                     <p class="text-xs font-semibold text-orange-800 flex items-center gap-1">
                                         <iconify-icon icon="solar:danger-triangle-bold" width="12"></iconify-icon>
                                         Lifecycle Breach
@@ -437,18 +551,23 @@
                             </div>
                         </div>
                         
-                        ${shipment.delPod ? `
+                        <!-- Proof of Delivery (always show section) -->
                         <div class="bg-white rounded-xl premium-border premium-shadow p-6">
                             <h3 class="text-sm font-bold text-slate-900 mb-4">Proof of Delivery</h3>
-                            <a href="${escapeHtml(shipment.delPod)}" target="_blank" class="block">
-                                <img src="${escapeHtml(shipment.delPod)}" alt="Delivery POD" class="w-full rounded-lg border border-slate-200 hover:border-blue-400 transition-colors">
-                            </a>
+                            ${shipment.delPod ? `
+                            <div class="block">
+                                <img src="${escapeHtml(shipment.delPod)}" alt="Delivery POD" class="w-full rounded-lg border border-slate-200 hover:border-blue-400 transition-colors object-contain max-h-80 bg-slate-50" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n) n.style.display='block';">
+                                <p class="text-xs text-slate-500 p-4 text-center bg-slate-50 rounded-lg border border-slate-200" style="display:none;">Image could not be loaded. <a href="${escapeHtml(shipment.delPod)}" target="_blank" class="text-blue-600 font-medium">Open link</a></p>
+                            </div>
                             <a href="${escapeHtml(shipment.delPod)}" target="_blank" class="mt-3 flex items-center justify-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium">
                                 <iconify-icon icon="solar:gallery-wide-linear" width="14"></iconify-icon>
                                 View Full Image
                             </a>
+                            ` : `
+                            <p class="text-sm text-slate-500 py-4 text-center">No POD image available for this shipment.</p>
+                            <p class="text-[10px] text-slate-400 text-center">If your Excel has a POD column (e.g. POD, delPod, Proof of Delivery), re-upload and it will appear here.</p>
+                            `}
                         </div>
-                        ` : ''}
                         
                         <button onclick="loadShipment()" class="w-full px-4 py-3 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 flex items-center justify-center gap-2">
                             <iconify-icon icon="solar:refresh-linear" width="16"></iconify-icon>
@@ -459,35 +578,68 @@
             `;
         }
 
+        /** Format timeline date for display: "03 Jan 2026, 16:19" (preserves time; does not use parseApiDate which zeros time) */
+        function formatTimelineDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return '';
+            const d = new Date(dateStr.trim());
+            if (isNaN(d.getTime())) return dateStr.trim();
+            const day = d.getDate();
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const month = months[d.getMonth()];
+            const year = d.getFullYear();
+            const h = d.getHours();
+            const m = d.getMinutes();
+            const time = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+            return day + ' ' + month + ' ' + year + ', ' + time;
+        }
+
+        /** Get first non-empty string from scan using common API field names */
+        function scanVal(scan, keys) {
+            for (const k of keys) {
+                const v = scan[k];
+                if (v != null && String(v).trim() !== '') return String(v).trim();
+            }
+            return '';
+        }
+
         /**
-         * Render timeline from scans array
-         * Scan fields: statusDateTime, statusCode, statusCodeDescription, reasonCode, reasonCodeDescription, currentLocation
+         * Render timeline from scans array (newest first). Uses all common field names so API variations show fully.
          */
         function renderTimeline(scans) {
             if (!scans || scans.length === 0) {
                 return '<p class="text-sm text-slate-400">No tracking history available</p>';
             }
+            const ordered = [...scans].reverse();
 
-            return scans.map((scan, i) => {
-                const statusIcon = getStatusIcon(scan.statusCode);
-                const statusColor = getTimelineColor(scan.statusCode);
-                
+            return ordered.map((scan, i) => {
+                const desc = scanVal(scan, ['statusDescription', 'statusCodeDescription', 'status_code_description', 'status_description', 'description']) || statusCodeToDisplayName(scanVal(scan, ['statusCode', 'status_code'])) || 'Update';
+                const statusCode = scanVal(scan, ['statusCode', 'status_code']);
+                const statusIcon = getStatusIcon(statusCode);
+                const statusColor = getTimelineColor(statusCode);
+                const location = scanVal(scan, ['currentLocation', 'current_location', 'location', 'facility', 'hub', 'city']);
+                const dateDisplay = formatTimelineDate(scanVal(scan, ['statusDateTime', 'status_date_time', 'statusDate', 'scan_date', 'createdAt', 'created_at']));
+                const reason = scanVal(scan, ['reasonCodeDescription', 'reason_description', 'reason_code_description', 'reasonDescription', 'remarks', 'comment', 'instruction', 'notes']);
+                const reasonCode = scanVal(scan, ['reasonCode', 'reason_code']);
+                const showReason = reason || (reasonCode ? 'Code: ' + reasonCode : '');
+                const extraLine = scanVal(scan, ['instruction', 'notes', 'remarks', 'comment']);
+                const showExtra = extraLine && extraLine !== reason ? extraLine : '';
                 return `
                     <div class="flex gap-4">
                         <div class="flex flex-col items-center">
                             <div class="w-8 h-8 rounded-full flex items-center justify-center ${statusColor}">
                                 <iconify-icon icon="${statusIcon}" width="14"></iconify-icon>
                             </div>
-                            ${i < (scans.length - 1) ? '<div class="w-0.5 flex-1 bg-slate-200 min-h-[20px]"></div>' : ''}
+                            ${i < (ordered.length - 1) ? '<div class="w-0.5 flex-1 bg-slate-200 min-h-[20px]"></div>' : ''}
                         </div>
-                        <div class="pb-4 flex-1">
-                            <div class="flex items-center justify-between">
-                                <p class="text-xs font-semibold text-slate-900">${escapeHtml(scan.statusCodeDescription || scan.statusCode || 'Update')}</p>
-                                <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(scan.statusCode)}</span>
+                        <div class="pb-5 flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-sm font-semibold text-slate-900">${escapeHtml(desc)}</p>
+                                <span class="text-[10px] font-medium text-slate-500 shrink-0 px-2 py-0.5 rounded bg-slate-100">${escapeHtml(statusCode)}</span>
                             </div>
-                            <p class="text-[10px] text-slate-500">${escapeHtml(scan.currentLocation || '')}</p>
-                            <p class="text-[10px] text-slate-400">${escapeHtml(scan.statusDateTime || '')}</p>
-                            ${scan.reasonCodeDescription ? `<p class="text-[10px] text-amber-600 mt-1">${escapeHtml(scan.reasonCodeDescription)}</p>` : ''}
+                            ${location ? `<p class="text-xs text-slate-600 mt-1">${escapeHtml(location)}</p>` : ''}
+                            ${dateDisplay ? `<p class="text-xs text-slate-500 mt-0.5">${escapeHtml(dateDisplay)}</p>` : ''}
+                            ${showReason ? `<p class="text-xs text-amber-700 mt-1 font-medium">${escapeHtml(showReason)}</p>` : ''}
+                            ${showExtra ? `<p class="text-[10px] text-slate-500 mt-0.5">${escapeHtml(showExtra)}</p>` : ''}
                         </div>
                     </div>
                 `;
@@ -495,11 +647,15 @@
         }
 
         function getStatusIcon(code) {
+            const c = (code || '').toUpperCase();
             const icons = {
                 'DDL': 'solar:check-circle-bold',
+                'RTD': 'solar:delivery-linear',
+                'RTO': 'solar:return-up-back-linear',
+                'RTL': 'solar:lock-linear',
+                'UDD': 'solar:close-circle-linear',
                 'OFD': 'solar:delivery-linear',
                 'DDS': 'solar:calendar-linear',
-                'UDD': 'solar:close-circle-linear',
                 'PKD': 'solar:box-linear',
                 'MAN': 'solar:clipboard-list-linear',
                 'IND': 'solar:inbox-in-linear',
@@ -508,25 +664,26 @@
                 'ARD': 'solar:map-arrow-down-linear',
                 'RDC': 'solar:buildings-linear',
                 'DBG': 'solar:inbox-out-linear',
-                'RTO': 'solar:return-up-back-linear',
             };
-            return icons[code] || 'solar:point-on-map-linear';
+            return icons[c] || 'solar:point-on-map-linear';
         }
 
         function getTimelineColor(code) {
-            if (code === 'DDL') return 'bg-emerald-100 text-emerald-600';
-            if (code === 'OFD' || code === 'DDS') return 'bg-amber-100 text-amber-600';
-            if (code === 'UDD') return 'bg-rose-100 text-rose-600';
-            if (code === 'RTO') return 'bg-red-100 text-red-600';
+            const c = (code || '').toUpperCase();
+            if (c === 'DDL') return 'bg-emerald-100 text-emerald-600';
+            if (c === 'RTD') return 'bg-blue-100 text-blue-600';
+            if (c === 'RTO' || c === 'RTL') return 'bg-red-100 text-red-600';
+            if (c === 'UDD') return 'bg-rose-100 text-rose-600';
+            if (c === 'OFD' || c === 'DDS') return 'bg-amber-100 text-amber-600';
             return 'bg-blue-100 text-blue-600';
         }
 
         function getStatusClass(statusCode) {
             const code = (statusCode || '').toUpperCase();
             if (code === 'DDL') return 'bg-emerald-100 text-emerald-700';
+            if (code === 'RTD' || code === 'RTO') return 'bg-slate-100 text-slate-700';
             if (['MAN', 'PKD', 'IND', 'BGD', 'DPD', 'ARD', 'RDC', 'DBG'].includes(code)) return 'bg-blue-100 text-blue-700';
             if (code === 'OFD' || code === 'DDS') return 'bg-amber-100 text-amber-700';
-            if (code === 'RTO') return 'bg-rose-100 text-rose-700';
             if (code === 'UDD' || code === 'NDR') return 'bg-orange-100 text-orange-700';
             if (code === 'CAN') return 'bg-slate-100 text-slate-700';
             return 'bg-slate-100 text-slate-700';

@@ -3,21 +3,28 @@ import Redis from 'ioredis';
 import { CONFIG } from '../config';
 import { logger } from '../utils/logger';
 
-// ============================================================
-// REDIS CONNECTION
-// ============================================================
-export const redisConnection = new Redis(CONFIG.REDIS_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-});
+const redisEnabled = Boolean(CONFIG.REDIS_URL && CONFIG.REDIS_URL.trim());
 
-redisConnection.on('connect', () => {
-    logger.info('Redis connected');
-});
+// ============================================================
+// REDIS CONNECTION (only when REDIS_URL is set)
+// ============================================================
+export const redisConnection: Redis | null = redisEnabled
+    ? new Redis(CONFIG.REDIS_URL!, {
+          maxRetriesPerRequest: null,
+          enableReadyCheck: false,
+      })
+    : null;
 
-redisConnection.on('error', (err) => {
-    logger.error({ err }, 'Redis error');
-});
+if (redisConnection) {
+    redisConnection.on('connect', () => {
+        logger.info('Redis connected');
+    });
+    redisConnection.on('error', (err) => {
+        logger.warn({ err: err.message }, 'Redis not available (queue/sync disabled). Set REDIS_URL or start Redis to enable.');
+    });
+} else {
+    logger.info('Redis not configured (REDIS_URL empty). Queue/sync disabled. Set REDIS_URL to enable.');
+}
 
 // ============================================================
 // JOB TYPES
@@ -31,31 +38,45 @@ export interface SyncJobData {
 }
 
 // ============================================================
-// TRACKING QUEUE
+// TRACKING QUEUE (or stub when Redis disabled)
 // ============================================================
-export const trackingQueue = new Queue<SyncJobData>('tracking-sync', {
-    connection: redisConnection,
-    defaultJobOptions: {
-        attempts: CONFIG.MAX_RETRIES,
-        backoff: {
-            type: 'exponential',
-            delay: CONFIG.INITIAL_RETRY_DELAY,
-        },
-        removeOnComplete: { count: 1000 },
-        removeOnFail: { count: 5000 },
-    },
-});
+const _queue: Queue<SyncJobData> | null = redisConnection
+    ? new Queue<SyncJobData>('tracking-sync', {
+          connection: redisConnection,
+          defaultJobOptions: {
+              attempts: CONFIG.MAX_RETRIES,
+              backoff: {
+                  type: 'exponential',
+                  delay: CONFIG.INITIAL_RETRY_DELAY,
+              },
+              removeOnComplete: { count: 1000 },
+              removeOnFail: { count: 5000 },
+          },
+      })
+    : null;
 
-// Queue events for monitoring
-const queueEvents = new QueueEvents('tracking-sync', { connection: redisConnection });
+const _queueEvents: QueueEvents | null = redisConnection
+    ? new QueueEvents('tracking-sync', { connection: redisConnection })
+    : null;
 
-queueEvents.on('completed', ({ jobId }) => {
-    logger.debug({ jobId }, 'Job completed');
-});
+if (_queueEvents) {
+    _queueEvents.on('completed', ({ jobId }) => {
+        logger.debug({ jobId }, 'Job completed');
+    });
+    _queueEvents.on('failed', ({ jobId, failedReason }) => {
+        logger.error({ jobId, reason: failedReason }, 'Job failed');
+    });
+}
 
-queueEvents.on('failed', ({ jobId, failedReason }) => {
-    logger.error({ jobId, reason: failedReason }, 'Job failed');
-});
+export const trackingQueue: Queue<SyncJobData> = _queue ?? ({
+    getWaitingCount: () => Promise.resolve(0),
+    getActiveCount: () => Promise.resolve(0),
+    getCompletedCount: () => Promise.resolve(0),
+    getFailedCount: () => Promise.resolve(0),
+    close: () => Promise.resolve(),
+    add: () => Promise.resolve({} as never),
+    addBulk: () => Promise.resolve([]),
+} as unknown as Queue<SyncJobData>);
 
 // ============================================================
 // DISTRIBUTED RATE LIMITER
@@ -237,35 +258,58 @@ export class CircuitBreaker {
 }
 
 // ============================================================
-// GLOBAL INSTANCES
+// GLOBAL INSTANCES (stubs when Redis disabled)
 // ============================================================
-export const rateLimiter = new DistributedRateLimiter(
-    redisConnection,
-    'api:ratelimit:tracking',
-    CONFIG.REQUESTS_PER_MINUTE,
-    60000
-);
+const stubRateLimiter = {
+    acquire: () => Promise.resolve(true),
+    waitForSlot: () => Promise.resolve(true),
+    getUsage: () => Promise.resolve({ used: 0, limit: CONFIG.REQUESTS_PER_MINUTE }),
+};
+const stubSemaphore = {
+    acquire: () => Promise.resolve(true),
+    release: () => Promise.resolve(),
+    getCurrent: () => Promise.resolve(0),
+};
+const stubCircuitBreaker = {
+    isOpen: () => Promise.resolve(false),
+    recordSuccess: () => Promise.resolve(),
+    recordFailure: () => Promise.resolve(),
+    getState: () => Promise.resolve({ status: 'closed', failures: 0 }),
+};
 
-export const concurrencyLimiter = new DistributedSemaphore(
-    redisConnection,
-    'api:concurrent:tracking',
-    CONFIG.MAX_CONCURRENT_REQUESTS,
-    CONFIG.REQUEST_TIMEOUT + 5000
-);
+export const rateLimiter = redisConnection
+    ? new DistributedRateLimiter(
+          redisConnection,
+          'api:ratelimit:tracking',
+          CONFIG.REQUESTS_PER_MINUTE,
+          60000
+      )
+    : (stubRateLimiter as unknown as DistributedRateLimiter);
 
-export const circuitBreaker = new CircuitBreaker(
-    redisConnection,
-    'api:circuit:tracking',
-    CONFIG.CIRCUIT_BREAKER_THRESHOLD,
-    CONFIG.CIRCUIT_BREAKER_RESET_TIMEOUT
-);
+export const concurrencyLimiter = redisConnection
+    ? new DistributedSemaphore(
+          redisConnection,
+          'api:concurrent:tracking',
+          CONFIG.MAX_CONCURRENT_REQUESTS,
+          CONFIG.REQUEST_TIMEOUT + 5000
+      )
+    : (stubSemaphore as unknown as DistributedSemaphore);
+
+export const circuitBreaker = redisConnection
+    ? new CircuitBreaker(
+          redisConnection,
+          'api:circuit:tracking',
+          CONFIG.CIRCUIT_BREAKER_THRESHOLD,
+          CONFIG.CIRCUIT_BREAKER_RESET_TIMEOUT
+      )
+    : (stubCircuitBreaker as unknown as CircuitBreaker);
 
 // ============================================================
 // CLEANUP
 // ============================================================
 export async function closeQueue(): Promise<void> {
     await trackingQueue.close();
-    await queueEvents.close();
-    redisConnection.disconnect();
+    if (_queueEvents) await _queueEvents.close();
+    if (redisConnection) redisConnection.disconnect();
     logger.info('Queue connections closed');
 }

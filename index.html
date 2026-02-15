@@ -6,6 +6,7 @@
     <title>UrbaneBolt • Operations Dashboard</title>
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico">
+    <!-- Tailwind: for production build use PostCSS/CLI (https://tailwindcss.com/docs/installation) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
     <!-- Charts -->
@@ -18,10 +19,15 @@
     <script src="api.js"></script>
     <script src="config.js"></script>
     <style>
+        html { scroll-behavior: smooth; }
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+        .insights-flow { overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+        .insights-flow::-webkit-scrollbar { height: 8px; }
+        .insights-flow .insight-card { scroll-snap-align: start; scroll-snap-stop: normal; min-width: min(320px, 100%); }
+        @media (min-width: 1024px) { .insights-flow { overflow-x: visible; scroll-snap-type: none; } }
         .premium-shadow { box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03); }
         .premium-border { border: 1px solid #e2e8f0; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -76,6 +82,7 @@
         .sla-breach { background-color: #fef3c7; color: #b45309; }
         .sla-critical { background: linear-gradient(135deg, #fee2e2, #fef3c7); color: #dc2626; animation: pulse 2s infinite; }
         
+        .dashboard-scroll { scroll-behavior: smooth; }
         /* Row highlight for failures */
         .row-failure { 
             background-color: #fef2f2 !important; 
@@ -201,13 +208,21 @@
                     
                     <div class="h-8 w-px bg-slate-200 hidden md:block"></div>
                     
-                    <!-- Excel Upload -->
-                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleExcelUpload(event)">
-                    <button onclick="document.getElementById('excelFileInput').click()" 
+                    <!-- Import Excel: single button → file input → POST /api/v1/upload → MongoDB → refresh dashboard -->
+                    <input type="file" id="mongoUploadInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleUploadToMongo(event)">
+                    <button onclick="document.getElementById('mongoUploadInput').click()" id="mongoUploadBtn"
                         class="px-4 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all flex items-center gap-2">
                         <iconify-icon icon="solar:file-text-linear" width="16"></iconify-icon>
-                        <span class="hidden sm:inline">Upload Excel</span>
+                        <span class="hidden sm:inline">Import Excel</span>
                         <span class="sm:hidden">Excel</span>
+                    </button>
+                    <!-- Optional: client-side Excel import (column picker, no server) -->
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleExcelUpload(event)">
+                    <button onclick="document.getElementById('excelFileInput').click()"
+                        class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-all flex items-center gap-2">
+                        <iconify-icon icon="solar:upload-linear" width="16"></iconify-icon>
+                        <span class="hidden sm:inline">Import from file (client)</span>
+                        <span class="sm:hidden">File</span>
                     </button>
                 </div>
                 
@@ -417,7 +432,7 @@
         </header>
 
         <!-- Scrollable Dashboard Area -->
-        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        <div id="dashboardScroll" class="dashboard-scroll flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6">
             
             <!-- KPI Cards -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -551,6 +566,23 @@
                 </div>
             </div>
 
+            <!-- Data Insights (not visible directly in table) -->
+            <div id="insightsSection" class="bg-white rounded-xl premium-border premium-shadow overflow-hidden scroll-mt-6">
+                <button id="insightsToggle" type="button" onclick="toggleInsightsPanel()" class="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/80 transition-colors">
+                    <span class="flex items-center gap-2">
+                        <iconify-icon icon="solar:chart-2-linear" width="20" class="text-indigo-500"></iconify-icon>
+                        <span class="text-sm font-bold text-slate-800">Data insights</span>
+                        <span class="text-xs text-slate-500 font-normal">(patterns not visible in the table)</span>
+                    </span>
+                    <iconify-icon id="insightsChevron" icon="solar:alt-arrow-down-linear" width="18" class="text-slate-400 transition-transform"></iconify-icon>
+                </button>
+                <div id="insightsPanel" class="hidden border-t border-slate-100">
+                    <div id="insightsContent" class="p-5 insights-flow flex gap-5 pb-2 lg:flex-wrap lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:overflow-visible">
+                        <!-- Filled by renderInsightsPanel() with charts -->
+                    </div>
+                </div>
+            </div>
+
             <!-- Results Table -->
             <div class="bg-white rounded-xl premium-border premium-shadow overflow-hidden">
                 <div class="p-5 border-b border-slate-100 flex items-center justify-between">
@@ -563,9 +595,17 @@
                         </p>
                     </div>
                     <div class="flex items-center gap-2">
+                        <button id="loadFromServerBtn" onclick="loadShipmentsFromMongo().then(() => {})" class="px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed" title="Load all shipments from MongoDB">
+                            <iconify-icon icon="solar:database-linear" width="14"></iconify-icon>
+                            Load from server
+                        </button>
                         <button onclick="autoRefreshShipments()" id="refreshBtn" class="px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 flex items-center gap-2" title="Refresh all tracked shipments">
                             <iconify-icon icon="solar:refresh-linear" width="14" id="refreshIcon"></iconify-icon>
                             Refresh All
+                        </button>
+                        <button id="fetchPodBtn" onclick="fetchPodFromApiInBatches()" class="px-3 py-2 text-xs font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed" title="Fetch POD image URLs from tracking API in batches of 20">
+                            <iconify-icon icon="solar:gallery-linear" width="14"></iconify-icon>
+                            Fetch POD from API
                         </button>
                         <button onclick="exportData()" class="px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2">
                             <iconify-icon icon="solar:download-linear" width="14"></iconify-icon>
@@ -647,7 +687,9 @@
             currentPage: 1,
             pageSize: 20,
             isLoading: false,
+            shipmentsLoading: false,
             trackedAwbs: new Set(),
+            insightsPanelOpen: false,
         };
 
         // =====================================================
@@ -655,13 +697,32 @@
         // =====================================================
         const DataLayer = {
             STORAGE_KEY: 'urbanebolt_shipments',
+            STORAGE_CHUNK_PREFIX: 'urbanebolt_shipments_chunk_',
+            STORAGE_CHUNK_COUNT_KEY: 'urbanebolt_shipments_chunks',
             AWB_LIST_KEY: 'urbanebolt_tracked_awbs',
             LAST_SYNC_KEY: 'urbanebolt_last_sync',
             SYNC_INTERVAL: 60 * 60 * 1000, // 1 hour in milliseconds
+            CACHE_CHUNK_SIZE: 800, // items per chunk to stay under localStorage ~5MB total
 
-            // Load cached shipments from localStorage
+            // Load cached shipments from localStorage (supports single key or chunked)
             loadCache() {
                 try {
+                    const chunkCount = localStorage.getItem(this.STORAGE_CHUNK_COUNT_KEY);
+                    if (chunkCount != null && chunkCount !== '') {
+                        const n = Math.max(0, parseInt(chunkCount, 10));
+                        if (n > 0) {
+                            const out = [];
+                            for (let i = 0; i < n; i++) {
+                                const key = this.STORAGE_CHUNK_PREFIX + i;
+                                const raw = localStorage.getItem(key);
+                                if (raw) {
+                                    const part = JSON.parse(raw);
+                                    if (Array.isArray(part)) out.push(...part);
+                                }
+                            }
+                            return out;
+                        }
+                    }
                     const cached = localStorage.getItem(this.STORAGE_KEY);
                     return cached ? JSON.parse(cached) : [];
                 } catch (e) {
@@ -670,13 +731,58 @@
                 }
             },
 
-            // Save shipments to localStorage
+            // Save shipments to localStorage; use chunked storage when single key would exceed quota
             saveCache(shipments) {
-                try {
-                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(shipments));
-                } catch (e) {
-                    console.warn('[DataLayer] Failed to save cache:', e);
+                const list = Array.isArray(shipments) ? shipments : [];
+                let useChunked = list.length > this.CACHE_CHUNK_SIZE;
+                if (!useChunked) {
+                    try {
+                        const single = JSON.stringify(list);
+                        if (single.length < 4 * 1024 * 1024) {
+                            try {
+                                localStorage.setItem(this.STORAGE_KEY, single);
+                                this._clearChunkedCache();
+                                return;
+                            } catch (e) {
+                                if (e && (e.name === 'QuotaExceededError' || e.code === 22)) useChunked = true;
+                                else throw e;
+                            }
+                        } else useChunked = true;
+                    } catch (e) {
+                        if (e && (e.name === 'QuotaExceededError' || e.code === 22)) useChunked = true;
+                        else {
+                            console.warn('[DataLayer] Failed to save cache:', e);
+                            return;
+                        }
+                    }
                 }
+                if (useChunked) {
+                    try {
+                        this._clearChunkedCache();
+                        const size = this.CACHE_CHUNK_SIZE;
+                        let chunks = 0;
+                        for (let i = 0; i < list.length; i += size) {
+                            const chunk = list.slice(i, i + size);
+                            localStorage.setItem(this.STORAGE_CHUNK_PREFIX + chunks, JSON.stringify(chunk));
+                            chunks++;
+                        }
+                        localStorage.setItem(this.STORAGE_CHUNK_COUNT_KEY, String(chunks));
+                        localStorage.removeItem(this.STORAGE_KEY);
+                    } catch (e) {
+                        console.warn('[DataLayer] Failed to save cache (chunked):', e);
+                    }
+                }
+            },
+
+            _clearChunkedCache() {
+                try {
+                    const n = localStorage.getItem(this.STORAGE_CHUNK_COUNT_KEY);
+                    if (n != null && n !== '') {
+                        const max = Math.max(0, parseInt(n, 10));
+                        for (let i = 0; i < max; i++) localStorage.removeItem(this.STORAGE_CHUNK_PREFIX + i);
+                    }
+                    localStorage.removeItem(this.STORAGE_CHUNK_COUNT_KEY);
+                } catch (_) {}
             },
 
             // Get list of tracked AWBs
@@ -724,6 +830,7 @@
             // Clear all data
             clearAll() {
                 localStorage.removeItem(this.STORAGE_KEY);
+                this._clearChunkedCache();
                 localStorage.removeItem(this.AWB_LIST_KEY);
                 localStorage.removeItem(this.LAST_SYNC_KEY);
             }
@@ -737,11 +844,10 @@
             if (typeof API !== 'undefined' && API.getConfig) {
                 const config = API.getConfig();
                 if (!config.baseUrl) {
-                    console.warn('[Fallback] API not configured, applying default config');
-                    API.configure({
-                        baseUrl: 'https://api.urbanebolt.in',
-                        maxBatchSize: 20,
-                    });
+                    const isLocal = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+                    const base = isLocal ? window.location.origin : 'https://api.urbanebolt.in';
+                    console.warn('[Fallback] API not configured, using', base);
+                    API.configure({ baseUrl: base, maxBatchSize: 20 });
                 }
             }
         })();
@@ -754,9 +860,9 @@
             if (typeof API !== 'undefined' && API.getConfig) {
                 const config = API.getConfig();
                 if (!config.baseUrl) {
-                    console.warn('[Init] API not configured, applying default config');
+                    const isLocal = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
                     API.configure({
-                        baseUrl: 'https://api.urbanebolt.in',
+                        baseUrl: isLocal ? window.location.origin : 'https://api.urbanebolt.in',
                         maxBatchSize: 20,
                     });
                 }
@@ -766,8 +872,8 @@
             document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-IN', { 
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
             });
-            const d = new Date();
-            document.getElementById('dateFilter').value = d.toISOString().slice(0, 10); // YYYY-MM-DD
+            // Leave date filter empty by default so all shipments show (Excel data is often historical)
+            document.getElementById('dateFilter').value = '';
 
             // Keyboard shortcuts
             document.getElementById('awbSearchInput').addEventListener('keydown', (e) => {
@@ -780,8 +886,10 @@
             // Check API connection
             checkApiConnection();
 
-            // Load cached data immediately
+            // Show cache first for instant display, then load all shipments from MongoDB so full list is always shown
             loadCachedData();
+            loadDashboardSummary();
+            loadShipmentsFromMongo().then(() => {});
 
             // Start auto-refresh (after a short delay to let API initialize)
             setTimeout(() => {
@@ -813,7 +921,7 @@
         });
 
         // =====================================================
-        // LOAD CACHED DATA
+        // LOAD CACHED DATA (localStorage fallback)
         // =====================================================
         function loadCachedData() {
             const cachedShipments = DataLayer.loadCache();
@@ -823,20 +931,183 @@
                 State.shipments = cachedShipments;
                 State.trackedAwbs = new Set(trackedAwbs);
                 
-                // Sort by most recent first
                 sortShipmentsByDate();
-                
-                // Update filter dropdowns with available options
                 updateFilterDropdowns();
-                
                 applyFiltersAndRender();
                 updateLastSyncDisplay();
                 
                 const lastSync = DataLayer.getLastSync();
                 if (lastSync > 0) {
                     const ago = formatTimeAgo(lastSync);
-                    showToast(`Loaded ${cachedShipments.length} shipments`, 'info');
+                    showToast(`Loaded ${cachedShipments.length} shipments from cache`, 'info');
                 }
+            }
+        }
+
+        // =====================================================
+        // TABLE LOADING STATE (spinner + message in table body)
+        // =====================================================
+        function showTableLoading(message) {
+            const tbody = document.getElementById('resultsTable');
+            const footer = document.getElementById('tableFooter');
+            if (!tbody) return;
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="py-16 text-center">
+                        <div class="flex flex-col items-center">
+                            <iconify-icon icon="solar:refresh-linear" width="40" class="text-blue-500 animate-spin mb-3"></iconify-icon>
+                            <p class="text-slate-600 font-medium">${message || 'Loading...'}</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            if (footer) footer.classList.add('hidden');
+        }
+
+        // =====================================================
+        // LOAD SHIPMENTS FROM MONGODB (source of truth – fetches ALL in chunks)
+        // =====================================================
+        async function loadShipmentsFromMongo() {
+            if (typeof API === 'undefined' || !API.getAllShipmentsFromMongo) return false;
+            const config = API.getConfig && API.getConfig();
+            if (!config || !config.baseUrl) return false;
+            if (State.shipmentsLoading) return false;
+
+            const loadBtn = document.getElementById('loadFromServerBtn');
+            State.shipmentsLoading = true;
+            if (loadBtn) {
+                loadBtn.disabled = true;
+                loadBtn.innerHTML = '<iconify-icon icon="solar:refresh-linear" width="14" class="animate-spin"></iconify-icon> Loading...';
+            }
+            showTableLoading('Loading shipments...');
+
+            try {
+                const data = await API.getAllShipmentsFromMongo({
+                    chunkSize: 100000,
+                    onProgress: function (loaded, total) {
+                        const msg = total ? `Loading shipments... ${loaded.toLocaleString()} / ${total.toLocaleString()}` : `Loading shipments... ${loaded.toLocaleString()}`;
+                        showTableLoading(msg);
+                    },
+                });
+                const list = (data.shipments || []).map(mongoDocToShipment).filter(s => s && s.awb);
+                State.shipments = list;
+                State.trackedAwbs = new Set(list.map(s => s.awb));
+                sortShipmentsByDate();
+                try {
+                    DataLayer.saveCache(State.shipments);
+                    DataLayer.updateLastSync();
+                } catch (e) {
+                    console.warn('[Mongo] Failed to cache', e);
+                }
+                updateFilterDropdowns();
+                clearFilters();
+                applyFiltersAndRender();
+                updateLastSyncDisplay();
+                await loadDashboardSummary();
+                if (list.length > 0) {
+                    showToast(`Loaded ${list.length.toLocaleString()} shipments from server`, 'success');
+                }
+                return true;
+            } catch (e) {
+                console.warn('[Mongo] Load failed, using cache if available:', e.message || e);
+                showTableLoading(State.shipments.length ? 'Using cached data. Load failed: ' + (e.message || e) : 'Load failed. Try again or check connection.');
+                if (e.status === 404 || e.status === 405 || (e.message && (e.message.includes('404') || e.message.includes('405')))) {
+                    showToast('Dashboard API not available. Start the backend (npm run dev:api in backend/) and open this page from the same URL (e.g. http://localhost:3000).', 'error');
+                }
+                if (State.shipments.length > 0) applyFiltersAndRender();
+                return false;
+            } finally {
+                State.shipmentsLoading = false;
+                if (loadBtn) {
+                    loadBtn.disabled = false;
+                    loadBtn.innerHTML = '<iconify-icon icon="solar:database-linear" width="14"></iconify-icon> Load from server';
+                }
+            }
+        }
+
+        /**
+         * Fetch POD image URLs from the tracking API in batches of 20 and merge into State.shipments.
+         */
+        async function fetchPodFromApiInBatches() {
+            const btn = document.getElementById('fetchPodBtn');
+            if (!State.shipments || State.shipments.length === 0) {
+                if (btn) btn.disabled = false;
+                return;
+            }
+            if (typeof API === 'undefined' || !API.tracking || !API.tracking.getPodUrlsFromTracking) {
+                alert('Tracking API not configured or getPodUrlsFromTracking not available.');
+                return;
+            }
+            const awbs = State.shipments.map(s => s.awb).filter(Boolean);
+            if (awbs.length === 0) return;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<iconify-icon icon="solar:refresh-linear" width="14" class="animate-spin"></iconify-icon> Fetching POD…';
+            }
+            try {
+                const podMap = await API.tracking.getPodUrlsFromTracking(awbs);
+                let updated = 0;
+                State.shipments.forEach(s => {
+                    if (s.awb && podMap[s.awb]) {
+                        s.delPod = podMap[s.awb];
+                        updated++;
+                    }
+                });
+                DataLayer.saveCache(State.shipments);
+                applyFiltersAndRender();
+                if (btn) btn.innerHTML = '<iconify-icon icon="solar:gallery-linear" width="14"></iconify-icon> Fetch POD from API';
+            } catch (e) {
+                console.error('[Dashboard] Fetch POD failed:', e);
+                if (btn) btn.innerHTML = '<iconify-icon icon="solar:gallery-linear" width="14"></iconify-icon> Fetch POD from API';
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        // =====================================================
+        // LOAD DASHBOARD SUMMARY FROM BACKEND (KPIs from Mongo aggregation)
+        // =====================================================
+        async function loadDashboardSummary() {
+            if (typeof API === 'undefined' || !API.getDashboardSummary) return false;
+            const config = API.getConfig && API.getConfig();
+            if (!config || !config.baseUrl) return false;
+            const el = (id) => document.getElementById(id);
+            try {
+                if (el('kpi-dsr')) el('kpi-dsr').textContent = '...';
+                const s = await API.getDashboardSummary();
+                const totalShipments = Number(s.totalShipments) || 0;
+                const slaPercentage = Number(s.slaPercentage) || 0;
+                const breachCount = Number(s.breachCount) || 0;
+                const openBreachCount = Number(s.openBreachCount) || 0;
+                const revenueAtRisk = Number(s.revenueAtRisk) || 0;
+                const rtoPercentage = Number(s.rtoPercentage) || 0;
+
+                const el = (id) => document.getElementById(id);
+                if (el('kpi-total')) el('kpi-total').textContent = totalShipments.toLocaleString();
+                if (el('kpi-dsr')) el('kpi-dsr').textContent = slaPercentage + '%';
+                if (el('kpi-delayed')) el('kpi-delayed').textContent = openBreachCount.toLocaleString();
+                if (el('kpi-breach')) el('kpi-breach').textContent = breachCount.toLocaleString();
+                if (el('kpi-cod')) el('kpi-cod').textContent = '₹' + revenueAtRisk.toLocaleString('en-IN');
+                if (el('kpi-avgdelay')) el('kpi-avgdelay').textContent = rtoPercentage + '% RTO';
+
+                if (typeof Chart !== 'undefined' && el('summaryChartCanvas')) {
+                    const other = Math.max(0, totalShipments - openBreachCount - breachCount);
+                    const legendEl = el('summaryChartLegend');
+                    if (legendEl) legendEl.textContent = totalShipments + ' total • ' + slaPercentage + '% on-time • ₹' + revenueAtRisk.toLocaleString('en-IN') + ' at risk';
+                    if (window._summaryChart) window._summaryChart.destroy();
+                    window._summaryChart = new Chart(el('summaryChartCanvas'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Open breach', 'Breach (late)', 'On time / In progress'],
+                            datasets: [{ data: [openBreachCount, breachCount, other], backgroundColor: ['#f59e0b', '#ef4444', '#10b981'] }],
+                        },
+                        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom' } } },
+                    });
+                }
+                return true;
+            } catch (e) {
+                console.warn('[Dashboard] Summary load failed:', e.message || e);
+                return false;
             }
         }
 
@@ -885,8 +1156,7 @@
             }
 
             console.log(`[AutoSync] Refreshing ${trackedAwbs.length} shipments...`);
-            setLoading(true, `Auto-refreshing ${trackedAwbs.length} shipments...`);
-
+            // Run in background without full-screen overlay
             try {
                 // Process in batches of 20 (API limit)
                 const batchSize = 20;
@@ -944,8 +1214,6 @@
             } catch (error) {
                 console.error('[AutoSync] Error:', error);
                 showToast('Auto-refresh failed. Will retry later.', 'error');
-            } finally {
-                setLoading(false);
             }
         }
 
@@ -1237,6 +1505,36 @@
         function onExcelModeToggle() {
             // In full-data mode, we still need AWB column, but UX is "import rows" vs "track AWBs"
             renderExcelPreview();
+        }
+
+        async function handleUploadToMongo(event) {
+            const file = event.target.files[0];
+            event.target.value = '';
+            if (!file) return;
+            const fileName = file.name;
+            const fileExt = fileName.split('.').pop().toLowerCase();
+            if (!['xlsx', 'xls', 'csv'].includes(fileExt)) {
+                showToast('Please select an Excel (.xlsx, .xls) or CSV file', 'error');
+                return;
+            }
+            const btn = document.getElementById('mongoUploadBtn');
+            if (btn) btn.disabled = true;
+            showToast(`Uploading ${fileName} to MongoDB...`, 'info');
+            try {
+                const res = await API.uploadExcel(file);
+                showToast(`Uploaded: ${res.insertedCount} new, ${res.modifiedCount} updated (${res.totalRows} rows)`, 'success');
+                await loadShipmentsFromMongo();
+                await loadDashboardSummary();
+            } catch (e) {
+                if (e.status === 404 || e.status === 405) {
+                    showToast('Upload API not available. Start the backend (npm run dev:api in backend/) and open this page from the same URL (e.g. http://localhost:3000).', 'error');
+                } else {
+                    const msg = e.message || String(e);
+                    const detail = e.detail ? ' — ' + e.detail : '';
+                    showToast('Upload failed: ' + msg + detail, 'error');
+                }
+            }
+            if (btn) btn.disabled = false;
         }
 
         function handleExcelUpload(event) {
@@ -1545,8 +1843,28 @@
                 productType: pickRowValue(row, keyMap, ['producttype', 'product_type', 'type', 'paymenttype', 'payment_type']),
                 delPod: pickRowValue(row, keyMap, ['delpod', 'pod', 'podurl', 'pod_url']),
                 deliveredOn: deliveredOn,
-                scans: [],
+                scans: buildScansFromExcelRow(row, keyMap, deliveredOn),
             };
+        }
+
+        /** Build timeline scans from Excel columns: manifest/first_scan, pickup, OFD, delivery */
+        function buildScansFromExcelRow(row, keyMap, deliveredOn) {
+            const pick = (keys) => pickRowValue(row, keyMap, keys);
+            const toTs = (v) => {
+                if (!v) return null;
+                const d = parseApiDate(v);
+                return d ? d.getTime() : null;
+            };
+            const entries = [];
+            const firstScan = pick(['first_scan_time', 'firstscantime', 'first_scan', 'manifest_time', 'manifestdate']);
+            if (firstScan) entries.push({ statusCode: 'MAN', statusDateTime: firstScan, statusDescription: 'Manifested', _ts: toTs(firstScan) });
+            const pickup = pick(['pickup_time', 'pickupdatetime', 'pickup_date', 'pickupdate', 'booking_date', 'bookingdate']);
+            if (pickup) entries.push({ statusCode: 'PKD', statusDateTime: pickup, statusDescription: 'Picked up', _ts: toTs(pickup) });
+            const ofd = pick(['ofd_time', 'ofd_datetime', 'ofddate', 'ofd_date']);
+            if (ofd) entries.push({ statusCode: 'OFD', statusDateTime: ofd, statusDescription: 'Out for delivery', _ts: toTs(ofd) });
+            if (deliveredOn) entries.push({ statusCode: 'DDL', statusDateTime: deliveredOn, statusDescription: 'Delivered', _ts: toTs(deliveredOn) });
+            entries.sort((a, b) => (a._ts || 0) - (b._ts || 0));
+            return entries.map(({ _ts, ...s }) => s);
         }
 
         async function importShipmentsFromExcelRows() {
@@ -2304,6 +2622,109 @@
             };
         }
 
+        /** Map MongoDB document (from GET /api/v1/dashboard/shipments) to UI shipment shape with correct delay & lifecycle */
+        function mongoDocToShipment(doc) {
+            const route = `${doc.origin || 'N/A'} → ${doc.destination || 'N/A'}`;
+            const lastUpdate = doc.deliveredOn || doc.uploadedAt || doc.bookingDate || '';
+            const eddStr = doc.edd ? (typeof doc.edd === 'string' ? doc.edd : new Date(doc.edd).toISOString()) : '';
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const bookingAt = parseApiDate(doc.bookingDate);
+            const eddDate = parseApiDate(doc.edd);
+            const deliveredAt = parseApiDate(doc.deliveredOn);
+            const isDelivered = !!deliveredAt;
+            const isRto = Boolean(doc.isRTO);
+
+            let shipmentAgeDays = null;
+            if (bookingAt) {
+                const end = deliveredAt || today;
+                shipmentAgeDays = Math.max(0, Math.floor((end.getTime() - bookingAt.getTime()) / (1000 * 60 * 60 * 24)));
+            } else if (doc.agingDays != null) {
+                shipmentAgeDays = Math.max(0, Math.floor(Number(doc.agingDays)));
+            }
+
+            let delayedDays = null;
+            if (eddDate) {
+                const actualDeliveryDate = deliveredAt || today;
+                delayedDays = Math.floor((eddDate.getTime() - actualDeliveryDate.getTime()) / (1000 * 60 * 60 * 24));
+            }
+            const isDelayed = delayedDays !== null && delayedDays < 0;
+
+            const LIFECYCLE_LIMIT_DAYS = 15;
+            const lifecycleBreach = (shipmentAgeDays != null && shipmentAgeDays > LIFECYCLE_LIMIT_DAYS && !isDelivered) || Boolean(doc.slaBreach);
+
+            let currentLocation = doc.destination || '';
+            if (isDelivered) currentLocation = 'Delivered';
+            else if (isRto) currentLocation = 'RTO';
+            else if (doc.status) currentLocation = String(doc.status);
+
+            let statusCode = (doc.status || '').toUpperCase();
+            if (isDelivered) statusCode = 'DELIVERED';
+            else if (isRto) statusCode = 'RTO';
+
+            const terminalStatus = isDelivered ? 'delivered' : (isRto ? 'rto' : '');
+            const failureReasons = [];
+            if (isRto) failureReasons.push('RTO');
+            if (lifecycleBreach) failureReasons.push('Lifecycle breach');
+            const isInFailureBucket = isRto || lifecycleBreach;
+
+            var scans = [];
+            if (doc.bookingDate) scans.push({ statusCode: 'PKD', statusDateTime: doc.bookingDate, statusDescription: 'Picked up' });
+            if (doc.deliveredOn) scans.push({ statusCode: 'DDL', statusDateTime: doc.deliveredOn, statusDescription: 'Delivered' });
+
+            return {
+                awb: String(doc.awb || ''),
+                orderNumber: '',
+                customer: doc.customer || 'N/A',
+                origin: doc.origin || 'N/A',
+                destination: doc.destination || 'N/A',
+                route: route,
+                currentLocation: currentLocation,
+                value: Number(doc.invoiceValue) || 0,
+                status: doc.status || (isDelivered ? 'Delivered' : isRto ? 'RTO' : 'N/A'),
+                statusCode: statusCode,
+                type: 'PPD',
+                lastUpdate: lastUpdate,
+                addedOn: doc.bookingDate || '',
+                edd: eddStr,
+                eddDate: eddStr,
+                weight: Number(doc.weight) || 0,
+                pieces: Math.max(0, Math.floor(Number(doc.pieces) || 1)),
+                isRto: isRto,
+                rtoStatus: isRto ? 1 : 0,
+                delPod: doc.delPod || '',
+                reasonCode: '',
+                reasonDescription: '',
+                scans: scans,
+                rawData: doc,
+                slaStatus: doc.slaStatus || (doc.slaBreach ? 'BREACH' : ''),
+                deliveryTAT: doc.deliveryTAT != null ? doc.deliveryTAT : null,
+                agingDays: doc.agingDays != null ? doc.agingDays : null,
+                slaBreach: Boolean(doc.slaBreach),
+                createdAt: doc.bookingDate || null,
+                deliveredAt: doc.deliveredOn || null,
+                shipmentAgeDays: shipmentAgeDays,
+                delayedDays: delayedDays,
+                tatExpectedDays: null,
+                tatActualDays: doc.deliveryTAT != null ? doc.deliveryTAT : null,
+                tatBreach: Boolean(doc.slaBreach),
+                tatOnTime: !doc.slaBreach,
+                ofdAgeingDays: null,
+                isOfdAgeing: false,
+                isTerminal: isDelivered || isRto,
+                lifecycleBreach: lifecycleBreach,
+                isDelayed: isDelayed,
+                isInFailureBucket: isInFailureBucket,
+                failureReasons: failureReasons,
+                terminalStatus: terminalStatus.toUpperCase(),
+                isDeliveredSuccess: isDelivered,
+                isDeliveredLate: Boolean(doc.slaBreach),
+                rdcDangerNoOfdToday: false,
+                rdcOfdLate: false,
+            };
+        }
+
         /**
          * Calculate full SLA / lifecycle metrics for a shipment
          * Implements:
@@ -2857,6 +3278,7 @@
             State.currentPage = 1;
             updateActiveFilterCount();
             updateFailureBucketAlert();
+            if (State.insightsPanelOpen) renderInsightsPanel(computeInsights(State.shipments));
             renderKPIs();
             renderTable();
         }
@@ -2899,6 +3321,278 @@
 
         function dismissFailureAlert() {
             document.getElementById('failureBucketAlert').classList.add('hidden');
+        }
+
+        /**
+         * Compute insights from shipment data (patterns not visible directly in the table).
+         */
+        function computeInsights(shipments) {
+            if (!Array.isArray(shipments) || shipments.length === 0) {
+                return { empty: true };
+            }
+            const total = shipments.length;
+
+            // Delivered: terminalStatus delivered or statusCode DELIVERED
+            const isDelivered = (s) => (s.terminalStatus && String(s.terminalStatus).toLowerCase() === 'delivered') || s.statusCode === 'DELIVERED';
+            const delivered = shipments.filter(isDelivered);
+            const delayed = shipments.filter(s => s.isDelayed === true);
+            const rto = shipments.filter(s => s.statusCode === 'RTO' || (s.terminalStatus && String(s.terminalStatus).toLowerCase() === 'rto'));
+
+            // Top delayed customers (by count)
+            const delayedByCustomer = {};
+            delayed.forEach(s => {
+                const c = (s.customer || 'N/A').trim();
+                delayedByCustomer[c] = (delayedByCustomer[c] || 0) + 1;
+            });
+            const topDelayedCustomers = Object.entries(delayedByCustomer)
+                .map(([name, count]) => ({ name, count, pct: total ? ((count / total) * 100).toFixed(1) : 0 }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 5);
+
+            // RTO rate by customer
+            const byCustomer = {};
+            shipments.forEach(s => {
+                const c = (s.customer || 'N/A').trim();
+                if (!byCustomer[c]) byCustomer[c] = { total: 0, rto: 0 };
+                byCustomer[c].total++;
+                if (s.statusCode === 'RTO' || (s.terminalStatus && String(s.terminalStatus).toLowerCase() === 'rto')) byCustomer[c].rto++;
+            });
+            const rtoByCustomer = Object.entries(byCustomer)
+                .filter(([, v]) => v.total >= 3)
+                .map(([name, v]) => ({ name, total: v.total, rto: v.rto, pct: v.total ? ((v.rto / v.total) * 100).toFixed(1) : 0 }))
+                .sort((a, b) => parseFloat(b.pct) - parseFloat(a.pct))
+                .slice(0, 5);
+
+            // Status distribution
+            const statusCounts = {};
+            shipments.forEach(s => {
+                const code = s.statusCode || 'Unknown';
+                statusCounts[code] = (statusCounts[code] || 0) + 1;
+            });
+            const statusDistribution = Object.entries(statusCounts)
+                .map(([code, count]) => ({ code, count, pct: total ? ((count / total) * 100).toFixed(1) : 0 }))
+                .sort((a, b) => b.count - a.count);
+
+            // Most common delay / failure reasons (reasonCode or reasonDescription)
+            const reasonCounts = {};
+            [...delayed, ...rto].forEach(s => {
+                const r = (s.reasonCode || s.reasonDescription || (s.failureReasons && s.failureReasons[0]) || 'Unknown').toString().trim();
+                if (!r) return;
+                reasonCounts[r] = (reasonCounts[r] || 0) + 1;
+            });
+            const topReasons = Object.entries(reasonCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([reason, count]) => ({ reason, count }));
+
+            // Hubs/lanes with most delays (origin or destination)
+            const delayedByOrigin = {};
+            const delayedByDest = {};
+            delayed.forEach(s => {
+                const o = (s.origin || 'N/A').trim();
+                const d = (s.destination || 'N/A').trim();
+                delayedByOrigin[o] = (delayedByOrigin[o] || 0) + 1;
+                delayedByDest[d] = (delayedByDest[d] || 0) + 1;
+            });
+            const worstOrigins = Object.entries(delayedByOrigin).sort((a, b) => b[1] - a[1]).slice(0, 3);
+            const worstDestinations = Object.entries(delayedByDest).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+            // Peak day of week (by last update / activity) + full week for chart
+            const dayCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            shipments.forEach(s => {
+                const d = parseApiDate(s.lastUpdate) || parseApiDate(s.addedOn);
+                if (d) dayCounts[d.getDay()]++;
+            });
+            const peakDay = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0];
+            const peakDayOfWeek = peakDay ? { day: dayNames[parseInt(peakDay[0], 10)], count: peakDay[1] } : null;
+            const dayDistribution = dayNames.map((day, i) => ({ day, count: dayCounts[i] || 0 }));
+
+            // Average TAT (delivered) when available
+            const tatValues = delivered.filter(s => s.tatActualDays != null && !isNaN(s.tatActualDays)).map(s => Number(s.tatActualDays));
+            const avgTatDays = tatValues.length ? (tatValues.reduce((a, b) => a + b, 0) / tatValues.length).toFixed(1) : null;
+
+            // Bottleneck: average days in each stage (when we have scans with timestamps)
+            let avgPkdToOfdDays = null;
+            let avgOfdToDdlDays = null;
+            const pkdOfdDiffs = [];
+            const ofdDdlDiffs = [];
+            shipments.forEach(s => {
+                const scans = (s.scans || []).slice();
+                if (scans.length < 2) return;
+                const getTs = (scan) => {
+                    const t = scan.statusDateTime && parseApiDate(scan.statusDateTime);
+                    return t ? t.getTime() : null;
+                };
+                const pkd = scans.find(sc => (sc.statusCode || '').toUpperCase() === 'PKD');
+                const ofd = scans.find(sc => (sc.statusCode || '').toUpperCase() === 'OFD');
+                const ddl = scans.find(sc => (sc.statusCode || '').toUpperCase() === 'DDL');
+                const tsPkd = pkd && getTs(pkd);
+                const tsOfd = ofd && getTs(ofd);
+                const tsDdl = ddl && getTs(ddl);
+                if (tsPkd && tsOfd) pkdOfdDiffs.push((tsOfd - tsPkd) / (1000 * 60 * 60 * 24));
+                if (tsOfd && tsDdl) ofdDdlDiffs.push((tsDdl - tsOfd) / (1000 * 60 * 60 * 24));
+            });
+            if (pkdOfdDiffs.length) avgPkdToOfdDays = (pkdOfdDiffs.reduce((a, b) => a + b, 0) / pkdOfdDiffs.length).toFixed(1);
+            if (ofdDdlDiffs.length) avgOfdToDdlDays = (ofdDdlDiffs.reduce((a, b) => a + b, 0) / ofdDdlDiffs.length).toFixed(1);
+
+            // Regional delivery performance (by destination): on-time % and RTO % per region
+            const isDeliveredRowR = (s) => (s.terminalStatus && String(s.terminalStatus).toLowerCase() === 'delivered') || s.statusCode === 'DELIVERED';
+            const isOnTimeR = (s) => { if (!isDeliveredRowR(s)) return false; if (s.delayedDays !== null && s.delayedDays !== undefined) return s.delayedDays >= 0; return true; };
+            const byRegion = {};
+            shipments.forEach(s => {
+                const region = (s.destination || 'N/A').trim();
+                if (!byRegion[region]) byRegion[region] = { total: 0, delivered: 0, onTime: 0, rto: 0 };
+                byRegion[region].total++;
+                if (isDeliveredRowR(s)) { byRegion[region].delivered++; if (isOnTimeR(s)) byRegion[region].onTime++; }
+                else if (s.statusCode === 'RTO' || (s.terminalStatus && String(s.terminalStatus).toLowerCase() === 'rto')) byRegion[region].rto++;
+            });
+            const regionalPerformance = Object.entries(byRegion)
+                .filter(([, v]) => v.total >= 10)
+                .map(([region, v]) => ({ region, total: v.total, onTimePct: v.delivered ? ((v.onTime / v.delivered) * 100).toFixed(1) : '0', rtoPct: v.total ? ((v.rto / v.total) * 100).toFixed(1) : '0' }))
+                .sort((a, b) => parseFloat(b.onTimePct) - parseFloat(a.onTimePct))
+                .slice(0, 10);
+
+            return {
+                empty: false,
+                total,
+                delivered: delivered.length,
+                delayed: delayed.length,
+                rto: rto.length,
+                topDelayedCustomers,
+                rtoByCustomer,
+                statusDistribution,
+                topReasons,
+                worstOrigins,
+                worstDestinations,
+                peakDayOfWeek,
+                dayDistribution,
+                regionalPerformance,
+                avgTatDays,
+                avgPkdToOfdDays,
+                avgOfdToDdlDays,
+            };
+        }
+
+        function toggleInsightsPanel() {
+            State.insightsPanelOpen = !State.insightsPanelOpen;
+            const panel = document.getElementById('insightsPanel');
+            const chevron = document.getElementById('insightsChevron');
+            if (panel) {
+                panel.classList.toggle('hidden', !State.insightsPanelOpen);
+                if (State.insightsPanelOpen) {
+                    renderInsightsPanel(computeInsights(State.shipments));
+                    const section = document.getElementById('insightsSection');
+                    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+            if (chevron) chevron.style.transform = State.insightsPanelOpen ? 'rotate(180deg)' : 'none';
+        }
+
+        // Professional palette: teal/success, coral/danger, amber/warning, indigo/slate for neutrals
+        const CHART_COLORS = {
+            delayed: ['#0d9488','#0f766e','#115e59','#134e4a','#042f2e'],      // teal
+            rto: ['#e11d48','#be123c','#9f1239','#881337','#4c0519'],         // rose
+            status: ['#0d9488','#6366f1','#64748b','#f59e0b','#e11d48','#94a3b8','#475569','#334155','#0f172a'],
+            reasons: ['#ea580c','#c2410c','#9a3412','#7c2d12','#431407'],      // orange
+            hubs: ['#7c3aed','#6d28d9','#5b21b6','#4c1d95','#3730a3','#312e81'],
+            day: ['#0d9488','#14b8a6','#2dd4bf','#5eead4','#99f6e4','#ccfbf1','#f0fdfa'],
+            regionGood: '#059669',
+            regionBad: '#dc2626',
+            regionMid: '#d97706',
+        };
+        const chartDefaults = { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0f172a', titleFont: { size: 12 }, bodyFont: { size: 11 }, padding: 10, cornerRadius: 8 } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#64748b' } }, y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, color: '#475569' } } } };
+
+        function renderInsightsPanel(insights) {
+            const container = document.getElementById('insightsContent');
+            if (!container) return;
+            if (typeof window._insightsCharts !== 'undefined' && Array.isArray(window._insightsCharts)) { window._insightsCharts.forEach(c => { try { c.destroy(); } catch (_) {} }); }
+            window._insightsCharts = [];
+            if (insights.empty || !State.shipments.length) {
+                container.innerHTML = '<p class="text-sm text-slate-500 col-span-full self-center">Load shipment data first to see insights.</p>';
+                return;
+            }
+            const { topDelayedCustomers, rtoByCustomer, statusDistribution, topReasons, worstOrigins, worstDestinations, dayDistribution, regionalPerformance, avgTatDays, avgPkdToOfdDays, avgOfdToDdlDays } = insights;
+            const cards = [];
+            const truncate = (s, len) => (s.length <= len ? s : s.slice(0, len) + '\u2026');
+
+            if (regionalPerformance && regionalPerformance.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-teal-800 uppercase tracking-wide mb-3">Regional delivery performance</h4><p class="text-[10px] text-slate-500 mb-2">On-time % by destination (min 10 shipments)</p><div class="h-56"><canvas id="insightChartRegion"></canvas></div><p class="text-[9px] text-slate-400 mt-2 flex items-center gap-3"><span><span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> Good (≥80%)</span><span><span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span> Mid (50–80%)</span><span><span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> Poor (&lt;50%)</span></p></div>`);
+            if (topDelayedCustomers.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-amber-800 uppercase tracking-wide mb-3">Top delayed customers</h4><div class="h-48"><canvas id="insightChartDelayed"></canvas></div></div>`);
+            if (rtoByCustomer.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-rose-800 uppercase tracking-wide mb-3">RTO rate by customer</h4><div class="h-48"><canvas id="insightChartRto"></canvas></div></div>`);
+            if (statusDistribution.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Status mix</h4><div class="h-52 flex items-center justify-center"><canvas id="insightChartStatus"></canvas></div></div>`);
+            if (topReasons.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-orange-800 uppercase tracking-wide mb-3">Delay / failure reasons</h4><div class="h-48"><canvas id="insightChartReasons"></canvas></div></div>`);
+            if (worstOrigins.length > 0 || worstDestinations.length > 0) {
+                const hubLabels = [...worstOrigins.map(([h]) => truncate(h,12)+' (O)'), ...worstDestinations.map(([h]) => truncate(h,12)+' (D)')];
+                const hubValues = [...worstOrigins.map(([,n]) => n), ...worstDestinations.map(([,n]) => n)];
+                cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-violet-800 uppercase tracking-wide mb-3">Hubs with most delays</h4><div class="h-40"><canvas id="insightChartHubs"></canvas></div></div>`);
+                window._insightsHubData = { labels: hubLabels, values: hubValues };
+            }
+            if (dayDistribution && dayDistribution.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-3">Activity by day</h4><div class="h-48"><canvas id="insightChartPeak"></canvas></div></div>`);
+            if (avgTatDays != null) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0 flex flex-col justify-center"><h4 class="text-xs font-bold text-blue-800 uppercase tracking-wide mb-1">Avg delivery TAT</h4><p class="text-2xl font-bold text-blue-600">${escapeHtml(avgTatDays)} <span class="text-sm font-normal text-slate-500">days</span></p><p class="text-[10px] text-slate-400 mt-1">Delivered only</p></div>`);
+            if (avgPkdToOfdDays != null || avgOfdToDdlDays != null) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0 flex flex-col justify-center"><h4 class="text-xs font-bold text-indigo-800 uppercase tracking-wide mb-2">Avg stage duration</h4><p class="text-sm text-slate-700">PKD → OFD: <strong>${avgPkdToOfdDays != null ? escapeHtml(avgPkdToOfdDays) : '—'} days</strong></p><p class="text-sm text-slate-700 mt-1">OFD → DDL: <strong>${avgOfdToDdlDays != null ? escapeHtml(avgOfdToDdlDays) : '—'} days</strong></p></div>`);
+
+            container.innerHTML = cards.length ? cards.join('') : '<p class="text-sm text-slate-500 col-span-full">No derived insights yet.</p>';
+
+            if (typeof Chart === 'undefined') return;
+            if (regionalPerformance && regionalPerformance.length > 0) {
+                const ctx = document.getElementById('insightChartRegion');
+                if (ctx) {
+                    const onTimePcts = regionalPerformance.map(r => parseFloat(r.onTimePct));
+                    const regionColors = onTimePcts.map(p => p >= 80 ? CHART_COLORS.regionGood : p >= 50 ? CHART_COLORS.regionMid : CHART_COLORS.regionBad);
+                    const rp = regionalPerformance;
+                    const ch = new Chart(ctx.getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: regionalPerformance.map(r => truncate(r.region, 14)),
+                            datasets: [{ label: 'On-time %', data: onTimePcts, backgroundColor: regionColors, borderWidth: 0 }],
+                        },
+                        options: {
+                            ...chartDefaults,
+                            indexAxis: 'y',
+                            scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true, max: 100 } },
+                            plugins: {
+                                ...chartDefaults.plugins,
+                                tooltip: {
+                                    ...chartDefaults.plugins.tooltip,
+                                    callbacks: {
+                                        afterLabel: function(ctx) {
+                                            const i = ctx.dataIndex;
+                                            if (rp[i]) return 'RTO: ' + rp[i].rtoPct + '%  |  Total: ' + rp[i].total;
+                                            return '';
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    });
+                    window._insightsCharts.push(ch);
+                }
+            }
+            if (topDelayedCustomers.length > 0) {
+                const ctx = document.getElementById('insightChartDelayed');
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: topDelayedCustomers.map(c => truncate(c.name,18)), datasets: [{ label: 'Delayed', data: topDelayedCustomers.map(c => c.count), backgroundColor: CHART_COLORS.delayed }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
+            }
+            if (rtoByCustomer.length > 0) {
+                const ctx = document.getElementById('insightChartRto');
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: rtoByCustomer.map(c => truncate(c.name,18)), datasets: [{ label: 'RTO %', data: rtoByCustomer.map(c => parseFloat(c.pct)), backgroundColor: CHART_COLORS.rto }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true, max: 100 } } } }); window._insightsCharts.push(ch); }
+            }
+            if (statusDistribution.length > 0) {
+                const ctx = document.getElementById('insightChartStatus');
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'doughnut', data: { labels: statusDistribution.map(s => s.code), datasets: [{ data: statusDistribution.map(s => s.count), backgroundColor: CHART_COLORS.status }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8 } }, tooltip: chartDefaults.plugins.tooltip } } }); window._insightsCharts.push(ch); }
+            }
+            if (topReasons.length > 0) {
+                const ctx = document.getElementById('insightChartReasons');
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: topReasons.map(r => truncate(r.reason,14)), datasets: [{ label: 'Count', data: topReasons.map(r => r.count), backgroundColor: CHART_COLORS.reasons }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
+            }
+            if (window._insightsHubData) {
+                const ctx = document.getElementById('insightChartHubs');
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: window._insightsHubData.labels, datasets: [{ label: 'Delays', data: window._insightsHubData.values, backgroundColor: CHART_COLORS.hubs }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
+                window._insightsHubData = null;
+            }
+            if (dayDistribution && dayDistribution.length > 0) {
+                const ctx = document.getElementById('insightChartPeak');
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: dayDistribution.map(d => d.day), datasets: [{ label: 'Shipments', data: dayDistribution.map(d => d.count), backgroundColor: CHART_COLORS.day }] }, options: { ...chartDefaults, indexAxis: 'x', scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
+            }
         }
 
         /**
@@ -3067,7 +3761,7 @@
                 return `
                 <tr class="${rowClass} hover:bg-slate-50/50 cursor-pointer transition-colors" onclick="viewShipment('${escapeHtml(s.awb)}')">
                     <td class="py-3 px-4">
-                        <span class="font-mono text-xs font-bold text-blue-600">${escapeHtml(s.awb)}</span>
+                        <a href="shipment.html?awb=${encodeURIComponent(s.awb)}" class="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded" onclick="event.stopPropagation();" title="Open shipment detail (tracking history)">${escapeHtml(s.awb)}</a>
                         ${s.orderNumber ? `<div class="text-[10px] text-slate-400 mt-0.5">#${escapeHtml(s.orderNumber)}</div>` : ''}
                     </td>
                     <td class="py-3 px-4">
@@ -3176,13 +3870,25 @@
          * Format SLA status badge
          */
         function formatSlaStatus(shipment) {
-            const { terminalStatus } = shipment;
+            const { terminalStatus, slaBreach, isDelayed, lifecycleBreach } = shipment;
             const isDelivered = terminalStatus && String(terminalStatus).toLowerCase() === 'delivered';
 
             if (isDelivered) {
+                if (slaBreach || (shipment.delayedDays != null && shipment.delayedDays < 0)) {
+                    return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold sla-delayed">
+                        <iconify-icon icon="solar:clock-circle-linear" width="10"></iconify-icon>
+                        Delayed
+                    </span>`;
+                }
                 return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold sla-ontime">
                     <iconify-icon icon="solar:verified-check-linear" width="10"></iconify-icon>
-                    Delivered
+                    On time
+                </span>`;
+            }
+            if (lifecycleBreach || isDelayed) {
+                return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold sla-breach">
+                    <iconify-icon icon="solar:warning-linear" width="10"></iconify-icon>
+                    ${lifecycleBreach ? 'Breach' : 'Delayed'}
                 </span>`;
             }
 

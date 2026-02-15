@@ -1,12 +1,151 @@
 import { Router, Request, Response } from 'express';
+import { ObjectId } from 'mongodb';
 import { query } from '../../db';
 import { logger } from '../../utils/logger';
 import { rateLimiter, concurrencyLimiter, circuitBreaker, trackingQueue } from '../../queue/tracking-queue';
+import { connectDB } from '../../lib/mongo';
+import { getCachedSummary, setCachedSummary } from '../../lib/dashboard-cache';
 
 const router = Router();
 
+function toSafeDoc(doc: Record<string, unknown>): Record<string, unknown> {
+    const d = { ...doc };
+    delete d._id;
+    ['bookingDate', 'edd', 'deliveredOn', 'uploadedAt'].forEach((k) => {
+        const v = d[k];
+        if (v instanceof Date && !Number.isNaN(v.getTime())) d[k] = v.toISOString();
+        else if (v != null && typeof v === 'string') d[k] = v;
+    });
+    return d;
+}
+
 // ============================================================
-// GET /api/v1/dashboard/stats - Dashboard aggregates
+// GET /api/v1/dashboard/shipments/:awb - Single shipment by AWB (MongoDB)
+// ============================================================
+router.get('/shipments/:awb', async (req: Request, res: Response) => {
+    const awb = (req.params.awb || '').trim().replace(/[^a-zA-Z0-9]/g, '');
+    if (!awb) {
+        return res.status(400).json({ error: 'AWB required' });
+    }
+    try {
+        const db = await connectDB();
+        const doc = await db.collection('shipments').findOne({ awb });
+        if (!doc) {
+            return res.status(404).json({ error: 'Shipment not found', awb });
+        }
+        const d = toSafeDoc(doc as Record<string, unknown>);
+        return res.json(d);
+    } catch (err: unknown) {
+        logger.error({ err, awb }, 'Get shipment by AWB failed');
+        return res.status(500).json({
+            error: 'Get shipment failed',
+            detail: err instanceof Error ? err.message : String(err),
+        });
+    }
+});
+
+// ============================================================
+// GET /api/v1/dashboard/shipments - List shipments (cursor)
+// Use ?after=ObjectIdHex for cursor-based pagination (no large skip).
+// ============================================================
+router.get('/shipments', async (req: Request, res: Response) => {
+    const rawLimit = Number(req.query.limit);
+    const limit = Math.min(200000, Math.max(1, Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : 10000));
+    const after = typeof req.query.after === 'string' && req.query.after.trim() ? req.query.after.trim() : null;
+    try {
+        const db = await connectDB();
+        const coll = db.collection('shipments');
+        let cursor;
+        if (after) {
+            try {
+                const afterId = new ObjectId(after);
+                cursor = coll.find({ _id: { $lt: afterId } }).sort({ _id: -1 }).limit(limit);
+            } catch {
+                return res.status(400).json({ error: 'Invalid after cursor' });
+            }
+        } else {
+            cursor = coll.find({}).sort({ _id: -1 }).limit(limit);
+        }
+        const shipments = await cursor.toArray();
+        const total = after ? 0 : await coll.countDocuments({});
+        const list = shipments.map((doc: Record<string, unknown>) => toSafeDoc(doc));
+        const last = shipments[shipments.length - 1];
+        const nextAfter = last && last._id ? String((last as { _id: ObjectId })._id) : null;
+        res.json({
+            shipments: list,
+            ...(total >= 0 && !after ? { total } : {}),
+            ...(nextAfter ? { nextAfter } : {}),
+        });
+    } catch (err: unknown) {
+        logger.error({ err, limit, after: after ? 'yes' : 'no' }, 'List shipments failed');
+        res.status(500).json({
+            error: 'List shipments failed',
+            detail: err instanceof Error ? err.message : String(err),
+        });
+    }
+});
+
+// ============================================================
+// GET /api/v1/dashboard/summary - Mongo aggregation (Excel uploads)
+// 60s in-memory cache; invalidated after upload so never stale post-batch.
+// ============================================================
+router.get('/summary', async (req: Request, res: Response) => {
+    try {
+        const cached = getCachedSummary();
+        if (cached) {
+            return res.json(cached);
+        }
+
+        const db = await connectDB();
+        const coll = db.collection('shipments');
+        const pipeline = [
+            {
+                $facet: {
+                    totals: [{ $count: 'totalShipments' }],
+                    breaches: [{ $match: { slaBreach: true } }, { $count: 'count' }],
+                    openBreach: [{ $match: { slaStatus: 'OPEN_BREACH' } }, { $count: 'count' }],
+                    onTime: [{ $match: { slaStatus: 'ON_TIME' } }, { $count: 'count' }],
+                    delivered: [{ $match: { deliveredOn: { $ne: null } } }, { $count: 'count' }],
+                    revenueAtRisk: [
+                        { $match: { slaStatus: { $in: ['OPEN_BREACH', 'IN_PROGRESS'] }, agingDays: { $gt: 3 } } },
+                        { $group: { _id: null, sum: { $sum: '$invoiceValue' } } },
+                    ],
+                    rto: [{ $match: { isRTO: true } }, { $count: 'count' }],
+                },
+            },
+        ];
+        const [result] = await coll.aggregate(pipeline).toArray();
+        const totalShipments = result?.totals?.[0]?.totalShipments ?? 0;
+        const breachCount = result?.breaches?.[0]?.count ?? 0;
+        const openBreachCount = result?.openBreach?.[0]?.count ?? 0;
+        const onTimeCount = result?.onTime?.[0]?.count ?? 0;
+        const deliveredCount = result?.delivered?.[0]?.count ?? 0;
+        const slaPercentage = deliveredCount > 0 ? Math.round((onTimeCount / deliveredCount) * 1000) / 10 : 0;
+        const revenueAtRisk = result?.revenueAtRisk?.[0]?.sum ?? 0;
+        const rtoCount = result?.rto?.[0]?.count ?? 0;
+        const rtoPercentage = totalShipments > 0 ? Math.round((rtoCount / totalShipments) * 1000) / 10 : 0;
+
+        const summary = {
+            totalShipments,
+            breachCount,
+            openBreachCount,
+            slaPercentage,
+            revenueAtRisk,
+            rtoPercentage,
+        };
+        setCachedSummary(summary);
+        res.json(summary);
+    } catch (err: unknown) {
+        logger.error({ err }, 'Dashboard summary failed');
+        res.status(500).json({
+            error: 'Dashboard summary failed',
+            detail: err instanceof Error ? err.message : String(err),
+        });
+    }
+});
+
+// ============================================================
+// GET /api/v1/dashboard/stats - Dashboard aggregates (Postgres)
 // ============================================================
 router.get('/stats', async (req: Request, res: Response) => {
     try {

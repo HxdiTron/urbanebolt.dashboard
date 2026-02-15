@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "mongodb": "^7.1.0",
+    "multer": "^2.0.2",
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/multer": "^2.0.0"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "buildCommand": "cd backend && npm install && npm run build",
+  "framework": null,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/metrics", "destination": "/api" },
+    { "source": "/delivery_pods/(.*)", "destination": "/api" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}

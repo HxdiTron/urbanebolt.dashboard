@@ -18,18 +18,74 @@ Production-grade logistics dashboard with secure API integration.
 
 ## Setup
 
-1. Create `config.js` with your API settings:
+### Excel upload & MongoDB dashboard (recommended for local use)
+
+1. **Start the backend** (serves the API and the dashboard):
+
+   ```bash
+   cd backend
+   npm install
+   # Set MONGODB_URI (and optionally MONGODB_DB) in .env
+   npm run dev:api
+   ```
+
+2. **Open the app from the same origin** as the API, e.g.  
+   **http://localhost:3000** (or the port your backend uses).  
+   The dashboard will use this URL automatically on localhost, so:
+   - **Upload to MongoDB** and **Load from server** work (no 404/405).
+
+If you open `index.html` from the file system or another host, set the API URL in `config.js` or override with `localStorage.setItem('urbanebolt_api_base', 'http://localhost:3000')`.
+
+**Redis is optional.** If you don't set `REDIS_URL` in `backend/.env`, the API runs without Redis (no connection errors). Queue/sync are disabled until you set `REDIS_URL`.
+
+### Quick check (run and verify)
+
+1. **Start the API** (from project root):
+   ```bash
+   cd backend && npm run build && npm run dev:api
+   ```
+   You should see: `Redis not configured ...`, `API server started`, `port: 3000`, and `MongoDB connected` (if `MONGODB_URI` is in `.env`). No Redis connection errors.
+
+2. **Open in browser:** **http://localhost:3000**
+   - Dashboard loads; KPIs may show 0 until you load data.
+   - **Import Excel** or **Load from server** to load shipments from MongoDB.
+   - Click an AWB to open **Shipment detail** (tracking history, Proof of Delivery, SLA).
+   - POD images: put files in `delivery_pods/` (e.g. `delivery_pods/WDJ/2026/01/03/xxx.png`) or set `DELIVERY_PODS_PATH` in `.env`.
+
+3. **Optional:** Use Live Server (e.g. port 5500) for `index.html`; the app will still call the API at `http://localhost:3000` (see `config.js`).
+
+### Optional: config.js override
+
+Override the API base URL (e.g. for a separate production API):
 
 ```javascript
-document.addEventListener('DOMContentLoaded', () => {
-    API.configure({
-        baseUrl: 'https://api.urbanebolt.in',
-        maxBatchSize: 20,  // Max 20, cannot exceed
-    });
-});
+localStorage.setItem('urbanebolt_api_base', 'https://api.urbanebolt.in');
 ```
 
-2. Open `index.html` in browser
+When deployed to Vercel, the app uses the same origin for API calls automatically.
+
+## Deploy to Vercel
+
+1. **Push the repo to GitHub** (if not already).
+
+2. **Import the project in Vercel**  
+   [vercel.com](https://vercel.com) → Add New Project → Import your repo.
+
+3. **Set environment variables** in Vercel project settings:
+   - `MONGODB_URI` – MongoDB connection string (e.g. MongoDB Atlas)
+   - `MONGODB_DB` – database name (default: `urbanebolt`)
+   - `API_BASE_URL` – external tracking API URL (default: `https://api.urbanebolt.in`)
+   - `DATABASE_URL` – Postgres connection string (optional; for queue stats/sync features)
+   - `REDIS_URL` – leave empty unless using queue/sync
+   - `DELIVERY_PODS_PATH` – optional; path to POD images (serverless has ephemeral storage)
+
+4. **Deploy**  
+   Vercel runs `cd backend && npm install && npm run build` and serves the app.  
+   API routes (`/api/*`, `/health`, `/metrics`) are handled by the serverless function.
+
+5. **Limitations on Vercel**
+   - POD images in `delivery_pods/` are not persisted (serverless storage is ephemeral). Use a cloud storage URL or external CDN for POD images.
+   - Redis/Postgres are optional; dashboard and Excel upload work with MongoDB only.
 
 ## API Endpoints Used
 
@@ -81,6 +137,6 @@ For production, consider:
 
 ## Tech Stack
 
-- HTML5 + TailwindCSS (CDN)
-- Vanilla JavaScript (no build required)
-- No dependencies to install
+- HTML5 + TailwindCSS (CDN in dev; for production use [Tailwind CLI or PostCSS](https://tailwindcss.com/docs/installation))
+- Vanilla JavaScript (no frontend build required)
+- No frontend dependencies to install
