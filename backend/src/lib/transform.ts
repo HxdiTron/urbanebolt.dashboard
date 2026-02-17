@@ -111,6 +111,8 @@ const HEADER_ALIASES: Record<string, string> = {
     isrto: 'isRTO',
     is_rto: 'isRTO',
     rto: 'isRTO',
+    rtostatus: 'isRTO',
+    rto_status: 'isRTO',
     ordernumber: 'orderNumber',
     order_number: 'orderNumber',
     orderid: 'orderNumber',
@@ -199,11 +201,12 @@ export function buildHeaderMap(headers: string[]): Map<number, string> {
 
 /**
  * Parse value to boolean (case-insensitive).
+ * Accepts: true, 1, yes, y, rto (so Excel "RTO" column is picked up).
  */
 export function parseBoolean(val: unknown): boolean {
     if (val === null || val === undefined) return false;
     const s = String(val).toLowerCase().trim();
-    return s === 'true' || s === '1' || s === 'yes' || s === 'y';
+    return s === 'true' || s === '1' || s === 'yes' || s === 'y' || s === 'rto';
 }
 
 /**
@@ -380,7 +383,7 @@ export function transformRow(
         invoiceValue: parseNumber(get('invoiceValue')),
         weight: parseNumber(get('weight')),
         pieces: Math.max(0, Math.floor(parseNumber(get('pieces')))),
-        isRTO: parseBoolean(get('isRTO')),
+        isRTO: parseBoolean(get('isRTO')) || ['RTO', 'RTD'].includes(String(get('status') ?? '').toUpperCase().trim()),
         slaStatus,
         slaBreach,
         deliveryTAT,

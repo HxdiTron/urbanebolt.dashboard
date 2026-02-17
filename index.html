@@ -3530,14 +3530,24 @@
             };
         }
 
-        function toggleInsightsPanel() {
+        async function toggleInsightsPanel() {
             State.insightsPanelOpen = !State.insightsPanelOpen;
             const panel = document.getElementById('insightsPanel');
             const chevron = document.getElementById('insightsChevron');
             if (panel) {
                 panel.classList.toggle('hidden', !State.insightsPanelOpen);
                 if (State.insightsPanelOpen) {
-                    renderInsightsPanel(computeInsights(State.shipments));
+                    let insights = null;
+                    if (typeof API !== 'undefined' && API.getDashboardInsights) {
+                        try {
+                            insights = await API.getDashboardInsights();
+                        } catch (_) {}
+                    }
+                    if (insights && !insights.empty) {
+                        renderInsightsPanel(insights);
+                    } else {
+                        renderInsightsPanel(computeInsights(State.shipments));
+                    }
                     const section = document.getElementById('insightsSection');
                     if (section) section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
@@ -3564,15 +3574,21 @@
             if (!container) return;
             if (typeof window._insightsCharts !== 'undefined' && Array.isArray(window._insightsCharts)) { window._insightsCharts.forEach(c => { try { c.destroy(); } catch (_) {} }); }
             window._insightsCharts = [];
-            if (insights.empty || !State.shipments.length) {
+            const fromApi = insights.fromApi === true;
+            if (insights.empty && !fromApi) {
                 container.innerHTML = '<p class="text-sm text-slate-500 col-span-full self-center">Load shipment data first to see insights.</p>';
                 return;
             }
-            const fromCurrentPage = State.serverPagination && State.serverPagination.pages && State.serverPagination.pages.length > 0;
-            const { topDelayedCustomers, rtoByCustomer, statusDistribution, topReasons, worstOrigins, worstDestinations, dayDistribution, regionalPerformance, avgTatDays, avgPkdToOfdDays, avgOfdToDdlDays } = insights;
+            if (insights.empty && fromApi) {
+                container.innerHTML = '<p class="text-sm text-slate-500 col-span-full self-center">No insights data in database yet.</p>';
+                return;
+            }
+            const fromCurrentPage = !fromApi && State.serverPagination && State.serverPagination.pages && State.serverPagination.pages.length > 0;
+            const { topDelayedCustomers = [], rtoByCustomer = [], statusDistribution = [], topReasons = [], worstOrigins = [], worstDestinations = [], dayDistribution = [], regionalPerformance = [], avgTatDays, avgPkdToOfdDays, avgOfdToDdlDays } = insights;
             const cards = [];
             const truncate = (s, len) => (s.length <= len ? s : s.slice(0, len) + '\u2026');
-            if (fromCurrentPage) cards.push(`<div class="insight-card col-span-full bg-amber-50 border border-amber-200 rounded-xl p-3 flex-shrink-0"><p class="text-xs text-amber-800"><strong>Note:</strong> Charts below are based on the current page of shipments (${State.shipments.length} rows), not the full database.</p></div>`);
+            if (fromApi) cards.push(`<div class="insight-card col-span-full bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex-shrink-0"><p class="text-xs text-emerald-800"><strong>Charts are based on all data in the database</strong>, not just the current page.</p></div>`);
+            else if (fromCurrentPage) cards.push(`<div class="insight-card col-span-full bg-amber-50 border border-amber-200 rounded-xl p-3 flex-shrink-0"><p class="text-xs text-amber-800"><strong>Note:</strong> Charts below are based on the current page of shipments (${State.shipments.length} rows), not the full database.</p></div>`);
 
             if (regionalPerformance && regionalPerformance.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-teal-800 uppercase tracking-wide mb-3">Regional delivery performance</h4><p class="text-[10px] text-slate-500 mb-2">On-time % by destination (min 10 shipments)</p><div class="h-56"><canvas id="insightChartRegion"></canvas></div><p class="text-[9px] text-slate-400 mt-2 flex items-center gap-3"><span><span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> Good (≥80%)</span><span><span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span> Mid (50–80%)</span><span><span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> Poor (&lt;50%)</span></p></div>`);
             if (topDelayedCustomers.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-amber-800 uppercase tracking-wide mb-3">Top delayed customers</h4><div class="h-48"><canvas id="insightChartDelayed"></canvas></div></div>`);

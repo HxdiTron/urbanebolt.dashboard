@@ -243,6 +243,163 @@ router.get('/pod', async (req: Request, res: Response) => {
 });
 
 // ============================================================
+// GET /api/v1/dashboard/insights - Full-DB chart data (Mongo)
+// Same shape as frontend computeInsights() so charts use all data, not current page.
+// ============================================================
+const INSIGHTS_MAX_TIME_MS = 20000;
+
+router.get('/insights', async (req: Request, res: Response) => {
+    try {
+        const db = await connectDB();
+        const coll = db.collection('shipments');
+
+        const delayedMatch = { $or: [ { slaStatus: 'OPEN_BREACH' }, { slaBreach: true } ] };
+        const rtoMatch = { $or: [ { isRTO: true }, { status: { $in: ['RTO', 'RTD', 'rto', 'rtd'] } } ] };
+
+        const pipeline: Record<string, unknown>[] = [
+            {
+                $facet: {
+                    topDelayedCustomers: [
+                        { $match: delayedMatch },
+                        { $group: { _id: { $ifNull: ['$customer', 'N/A'] }, count: { $sum: 1 } } },
+                        { $sort: { count: -1 } },
+                        { $limit: 5 },
+                        { $project: { name: '$_id', count: 1, _id: 0 } },
+                    ],
+                    rtoByCustomer: [
+                        { $group: { _id: { $ifNull: ['$customer', 'N/A'] }, total: { $sum: 1 }, rto: { $sum: { $cond: [{ $or: [{ $eq: ['$isRTO', true] }, { $in: [{ $toUpper: { $ifNull: ['$status', ''] } }, ['RTO', 'RTD']] }] }, 1, 0] } } } },
+                        { $match: { total: { $gte: 3 } } },
+                        { $addFields: { pct: { $cond: [{ $eq: ['$total', 0] }, '0', { $toString: { $round: [{ $multiply: [{ $divide: ['$rto', '$total'] }, 100] }, 1] } }] } } },
+                        { $sort: { pct: -1 } },
+                        { $limit: 5 },
+                        { $project: { name: '$_id', total: 1, rto: 1, pct: 1, _id: 0 } },
+                    ],
+                    statusDistribution: [
+                        { $group: { _id: { $ifNull: [{ $toUpper: { $trim: { input: '$status' } } }, 'UNKNOWN'] }, count: { $sum: 1 } } },
+                        { $sort: { count: -1 } },
+                        { $project: { code: '$_id', count: 1, _id: 0 } },
+                    ],
+                    topReasons: [
+                        { $match: { $or: [delayedMatch, rtoMatch] } },
+                        { $group: { _id: { $ifNull: [{ $trim: { input: { $toString: '$reasonCode' } } }, { $ifNull: [{ $trim: { input: { $toString: '$reasonDescription' } } }, 'Unknown'] }] }, count: { $sum: 1 } } },
+                        { $match: { _id: { $ne: '' } } },
+                        { $sort: { count: -1 } },
+                        { $limit: 5 },
+                        { $project: { reason: '$_id', count: 1, _id: 0 } },
+                    ],
+                    worstOrigins: [
+                        { $match: delayedMatch },
+                        { $group: { _id: { $ifNull: ['$origin', 'N/A'] }, count: { $sum: 1 } } },
+                        { $sort: { count: -1 } },
+                        { $limit: 3 },
+                        { $project: { hub: '$_id', count: 1, _id: 0 } },
+                    ],
+                    worstDestinations: [
+                        { $match: delayedMatch },
+                        { $group: { _id: { $ifNull: ['$destination', 'N/A'] }, count: { $sum: 1 } } },
+                        { $sort: { count: -1 } },
+                        { $limit: 3 },
+                        { $project: { hub: '$_id', count: 1, _id: 0 } },
+                    ],
+                    dayDistribution: [
+                        {
+                            $addFields: {
+                                _activityDate: {
+                                    $cond: {
+                                        if: { $ne: ['$lastUpdateTime', null] },
+                                        then: { $toDate: '$lastUpdateTime' },
+                                        else: { $cond: { if: { $ne: ['$uploadedAt', null] }, then: '$uploadedAt', else: '$bookingDate' } },
+                                    },
+                                },
+                            },
+                        },
+                        { $match: { _activityDate: { $type: 'date' } } },
+                        { $group: { _id: { $dayOfWeek: '$_activityDate' }, count: { $sum: 1 } } },
+                        { $sort: { _id: 1 } },
+                        { $project: { dayOfWeek: '$_id', count: 1, _id: 0 } },
+                    ],
+                    regionalPerformance: [
+                        {
+                            $group: {
+                                _id: { $ifNull: ['$destination', 'N/A'] },
+                                total: { $sum: 1 },
+                                delivered: { $sum: { $cond: [{ $ne: ['$deliveredOn', null] }, 1, 0] } },
+                                onTime: { $sum: { $cond: [{ $and: [{ $ne: ['$deliveredOn', null] }, { $ne: ['$slaBreach', true] }] }, 1, 0] } },
+                                rto: { $sum: { $cond: [{ $or: [{ $eq: ['$isRTO', true] }, { $in: [{ $toUpper: { $ifNull: ['$status', ''] } }, ['RTO', 'RTD']] }] }, 1, 0] } },
+                            },
+                        },
+                        { $match: { total: { $gte: 10 } } },
+                        {
+                            $project: {
+                                region: '$_id',
+                                total: 1,
+                                onTimePct: { $cond: [{ $eq: ['$delivered', 0] }, '0', { $toString: { $round: [{ $multiply: [{ $divide: ['$onTime', '$delivered'] }, 100] }, 1] } }] },
+                                rtoPct: { $cond: [{ $eq: ['$total', 0] }, '0', { $toString: { $round: [{ $multiply: [{ $divide: ['$rto', '$total'] }, 100] }, 1] } }] },
+                                _id: 0,
+                            },
+                        },
+                        { $sort: { onTimePct: -1 } },
+                        { $limit: 10 },
+                    ],
+                    avgTat: [
+                        { $match: { deliveredOn: { $ne: null }, deliveryTAT: { $ne: null, $type: 'number' } } },
+                        { $group: { _id: null, avg: { $avg: '$deliveryTAT' } } },
+                        { $project: { _id: 0 } },
+                    ],
+                },
+            },
+        ];
+
+        const [result] = await coll.aggregate(pipeline).maxTimeMS(INSIGHTS_MAX_TIME_MS).toArray();
+        const facet = (result?.topDelayedCustomers != null ? result : {}) as Record<string, unknown>;
+
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const rawDayDist = (facet.dayDistribution as { dayOfWeek?: number; count?: number }[]) || [];
+        const dayMap: Record<number, number> = {};
+        rawDayDist.forEach((d) => { dayMap[d.dayOfWeek ?? 0] = d.count ?? 0; });
+        const dayDistribution = dayNames.map((day, i) => ({ day, count: dayMap[i + 1] ?? 0 }));
+
+        const regionalPerformance = ((facet.regionalPerformance as { region?: string; total?: number; onTimePct?: string; rtoPct?: string }[]) || []).map((r) => ({
+            region: r.region ?? 'N/A',
+            total: r.total ?? 0,
+            onTimePct: String(r.onTimePct ?? '0'),
+            rtoPct: String(r.rtoPct ?? '0'),
+        }));
+
+        const topDelayedCustomers = ((facet.topDelayedCustomers as { name?: string; count?: number }[]) || []).map((c) => ({ name: c.name ?? 'N/A', count: c.count ?? 0, pct: '0' }));
+        const rtoByCustomer = ((facet.rtoByCustomer as { name?: string; total?: number; rto?: number; pct?: string }[]) || []).map((c) => ({ name: c.name ?? 'N/A', total: c.total ?? 0, rto: c.rto ?? 0, pct: String(c.pct ?? '0') }));
+        const statusDistribution = ((facet.statusDistribution as { code?: string; count?: number }[]) || []).map((s) => ({ code: s.code ?? 'Unknown', count: s.count ?? 0, pct: '0' }));
+        const topReasons = (facet.topReasons as { reason?: string; count?: number }[]) || [];
+        const worstOrigins = ((facet.worstOrigins as { hub?: string; count?: number }[]) || []).map((h) => [h.hub ?? 'N/A', h.count ?? 0] as [string, number]);
+        const worstDestinations = ((facet.worstDestinations as { hub?: string; count?: number }[]) || []).map((h) => [h.hub ?? 'N/A', h.count ?? 0] as [string, number]);
+        const avgTatRow = (facet.avgTat as { avg?: number }[])?.[0];
+        const avgTatDays = avgTatRow?.avg != null ? String(Number(avgTatRow.avg).toFixed(1)) : null;
+
+        res.json({
+            empty: false,
+            fromApi: true,
+            topDelayedCustomers,
+            rtoByCustomer,
+            statusDistribution,
+            topReasons,
+            worstOrigins,
+            worstDestinations,
+            dayDistribution,
+            regionalPerformance,
+            avgTatDays,
+            avgPkdToOfdDays: null,
+            avgOfdToDdlDays: null,
+        });
+    } catch (err: unknown) {
+        logger.error({ err }, 'Dashboard insights failed');
+        res.status(500).json({
+            error: 'Insights failed',
+            detail: err instanceof Error ? err.message : String(err),
+        });
+    }
+});
+
+// ============================================================
 // GET /api/v1/dashboard/stats - Dashboard aggregates (Postgres)
 // ============================================================
 router.get('/stats', async (req: Request, res: Response) => {

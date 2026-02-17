@@ -664,6 +664,25 @@ const API = (() => {
         return data;
     }
 
+    async function getDashboardInsights() {
+        if (!CONFIG.baseUrl) return null;
+        const url = `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/insights`;
+        try {
+            const response = await fetch(url);
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (_) {
+                return null;
+            }
+            if (!response.ok) return null;
+            return data;
+        } catch (_) {
+            return null;
+        }
+    }
+
     // =========================================================
     // PUBLIC API
     // =========================================================
@@ -679,6 +698,7 @@ const API = (() => {
         getAllShipmentsFromMongo,
         getShipmentByAwbFromMongo,
         getDashboardSummary,
+        getDashboardInsights,
         getStatus,
         clearQueue,
         MAX_BATCH_SIZE: 20,
