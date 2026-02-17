@@ -2,14 +2,40 @@ import { Router, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import https from 'https';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import { query } from '../../db';
 import { logger } from '../../utils/logger';
 import { rateLimiter, concurrencyLimiter, circuitBreaker, trackingQueue } from '../../queue/tracking-queue';
 import { connectDB } from '../../lib/mongo';
 import { getCachedSummary, setCachedSummary } from '../../lib/dashboard-cache';
+import { CONFIG } from '../../config';
 
 const router = Router();
 const POD_PROXY_TIMEOUT_MS = 15000;
+const POD_BATCH_MAX = 20;
+
+function getDeliveryPodsDir(): string {
+    const staticRoot = path.join(__dirname, '../../../');
+    return CONFIG.DELIVERY_PODS_PATH
+        ? path.resolve(CONFIG.DELIVERY_PODS_PATH)
+        : path.join(staticRoot, 'delivery_pods');
+}
+
+function relativePathFromPodUrl(urlOrPath: string): string | null {
+    const s = (urlOrPath || '').trim();
+    if (!s) return null;
+    const match = s.match(/delivery_pods[/\\](.+)$/i) || s.match(/^[/\\]?(.+)$/);
+    return match ? match[1].replace(/\\/g, '/') : s;
+}
+
+function mimeFromExt(ext: string): string {
+    const m: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+    };
+    return m[ext.toLowerCase()] || 'image/jpeg';
+}
 
 function toSafeDoc(doc: Record<string, unknown>): Record<string, unknown> {
     const d = { ...doc };
@@ -149,26 +175,94 @@ router.get('/summary', async (req: Request, res: Response) => {
 
         const db = await connectDB();
         const coll = db.collection('shipments');
+        const minValidEdd = new Date('2019-01-01T00:00:00Z');
+        const now = new Date();
+        const lifecycleLimitDays = 15;
+        const lifecycleLimitMs = lifecycleLimitDays * 24 * 60 * 60 * 1000;
+        const lifecycleCutoff = new Date(now.getTime() - lifecycleLimitMs);
         const pipeline = [
             {
                 $facet: {
                     totals: [{ $count: 'totalShipments' }],
-                    breaches: [{ $match: { slaBreach: true } }, { $count: 'count' }],
-                    openBreach: [{ $match: { slaStatus: 'OPEN_BREACH' } }, { $count: 'count' }],
-                    onTime: [{ $match: { slaStatus: 'ON_TIME' } }, { $count: 'count' }],
+                    deliveredLate: [
+                        {
+                            $match: {
+                                deliveredOn: { $ne: null },
+                                edd: { $ne: null, $gte: minValidEdd },
+                                $expr: { $gt: ['$deliveredOn', '$edd'] },
+                            },
+                        },
+                        { $count: 'count' },
+                    ],
+                    openBreach: [
+                        {
+                            $match: {
+                                deliveredOn: null,
+                                edd: { $ne: null, $gte: minValidEdd },
+                                $expr: { $gt: [now, '$edd'] },
+                            },
+                        },
+                        { $count: 'count' },
+                    ],
+                    lifecycleBreach: [
+                        {
+                            $match: {
+                                deliveredOn: null,
+                                bookingDate: { $ne: null, $lte: lifecycleCutoff },
+                                $or: [
+                                    { isRTO: { $ne: true } },
+                                    { isRTO: null },
+                                ],
+                            },
+                        },
+                        { $count: 'count' },
+                    ],
+                    onTime: [
+                        {
+                            $match: {
+                                deliveredOn: { $ne: null },
+                                $or: [
+                                    { edd: null },
+                                    { edd: { $lt: minValidEdd } },
+                                    { $expr: { $lte: ['$deliveredOn', '$edd'] } },
+                                ],
+                            },
+                        },
+                        { $count: 'count' },
+                    ],
                     delivered: [{ $match: { deliveredOn: { $ne: null } } }, { $count: 'count' }],
                     revenueAtRisk: [
-                        { $match: { slaStatus: { $in: ['OPEN_BREACH', 'IN_PROGRESS'] }, agingDays: { $gt: 3 } } },
+                        {
+                            $match: {
+                                deliveredOn: null,
+                                edd: { $ne: null, $gte: minValidEdd },
+                                $expr: { $gt: [now, '$edd'] },
+                                agingDays: { $gt: 3 },
+                            },
+                        },
                         { $group: { _id: null, sum: { $sum: '$invoiceValue' } } },
                     ],
-                    rto: [{ $match: { isRTO: true } }, { $count: 'count' }],
+                    rto: [
+                        {
+                            $match: {
+                                $or: [
+                                    { isRTO: true },
+                                    { status: { $in: ['RTO', 'RTD', 'rto', 'rtd'] } },
+                                    { $expr: { $in: [{ $toUpper: { $ifNull: ['$status', ''] } }, ['RTO', 'RTD']] } },
+                                ],
+                            },
+                        },
+                        { $count: 'count' },
+                    ],
                 },
             },
         ];
         const [result] = await coll.aggregate(pipeline).toArray();
         const totalShipments = result?.totals?.[0]?.totalShipments ?? 0;
-        const breachCount = result?.breaches?.[0]?.count ?? 0;
+        const deliveredLateCount = result?.deliveredLate?.[0]?.count ?? 0;
         const openBreachCount = result?.openBreach?.[0]?.count ?? 0;
+        const lifecycleBreachCount = result?.lifecycleBreach?.[0]?.count ?? 0;
+        const breachCount = lifecycleBreachCount;
         const onTimeCount = result?.onTime?.[0]?.count ?? 0;
         const deliveredCount = result?.delivered?.[0]?.count ?? 0;
         const slaPercentage = deliveredCount > 0 ? Math.round((onTimeCount / deliveredCount) * 1000) / 10 : 0;
@@ -215,16 +309,31 @@ router.get('/pod', async (req: Request, res: Response) => {
         const lib = u.protocol === 'https:' ? https : http;
         const chunks: Buffer[] = [];
         await new Promise<void>((resolve, reject) => {
-            const clientReq = lib.get(rawUrl, { timeout: POD_PROXY_TIMEOUT_MS }, (response) => {
+            const headers: Record<string, string> = {
+                'User-Agent': 'UrbaneBolt-Dashboard/1.0',
+                'Accept': 'image/*,*/*',
+            };
+            const clientReq = lib.get(rawUrl, { timeout: POD_PROXY_TIMEOUT_MS, headers }, (response) => {
                 if (response.statusCode && response.statusCode >= 400) {
                     reject(new Error(`Upstream returned ${response.statusCode}`));
                     return;
                 }
-                const ct = response.headers['content-type'] || 'image/jpeg';
+                // Detect content type from response or URL extension
+                let ct = response.headers['content-type'] || '';
+                if (!ct || !ct.startsWith('image/')) {
+                    const ext = u.pathname.toLowerCase().split('.').pop();
+                    const extMap: Record<string, string> = {
+                        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+                        gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+                    };
+                    ct = extMap[ext || ''] || 'image/jpeg';
+                }
                 response.on('data', (chunk: Buffer) => chunks.push(chunk));
                 response.on('end', () => {
                     res.setHeader('Content-Type', ct);
                     res.setHeader('Cache-Control', 'private, max-age=86400');
+                    res.setHeader('Access-Control-Allow-Origin', '*');
+                    res.setHeader('X-Content-Type-Options', 'nosniff');
                     res.send(Buffer.concat(chunks));
                     resolve();
                 });
@@ -243,17 +352,59 @@ router.get('/pod', async (req: Request, res: Response) => {
 });
 
 // ============================================================
+// POST /api/v1/dashboard/pod/batch - Get up to 20 POD images as base64 data URLs
+// Body: { paths: string[] } - each path is relative to delivery_pods (e.g. "THN/2026/02/05/xxx.png") or full URL containing delivery_pods/...
+// ============================================================
+router.post('/pod/batch', async (req: Request, res: Response) => {
+    const raw = req.body?.paths;
+    const paths = Array.isArray(raw) ? raw.slice(0, POD_BATCH_MAX).map((p: unknown) => String(p || '').trim()).filter(Boolean) : [];
+    if (paths.length === 0) {
+        return res.status(400).json({ error: 'Missing or empty paths array (max 20)' });
+    }
+    const baseDir = getDeliveryPodsDir();
+    if (!fs.existsSync(baseDir)) {
+        return res.status(503).json({ error: 'POD storage not configured', path: baseDir });
+    }
+    const results: { path: string; dataUrl: string }[] = [];
+    for (const p of paths) {
+        const rel = relativePathFromPodUrl(p) || p;
+        const safe = path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
+        const filePath = path.join(baseDir, safe);
+        if (!filePath.startsWith(baseDir) || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+            continue;
+        }
+        try {
+            const buf = fs.readFileSync(filePath);
+            const ext = path.extname(filePath).slice(1);
+            const mime = mimeFromExt(ext);
+            const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
+            results.push({ path: p, dataUrl });
+        } catch (err) {
+            logger.warn({ err, path: rel }, 'POD batch read failed');
+        }
+    }
+    res.json({ results });
+});
+
+// ============================================================
 // GET /api/v1/dashboard/insights - Full-DB chart data (Mongo)
 // Same shape as frontend computeInsights() so charts use all data, not current page.
 // ============================================================
 const INSIGHTS_MAX_TIME_MS = 20000;
 
+const MIN_VALID_EDD = new Date('2019-01-01T00:00:00Z');
+
 router.get('/insights', async (req: Request, res: Response) => {
     try {
         const db = await connectDB();
         const coll = db.collection('shipments');
-
-        const delayedMatch = { $or: [ { slaStatus: 'OPEN_BREACH' }, { slaBreach: true } ] };
+        const now = new Date();
+        const delayedMatch = {
+            $or: [
+                { deliveredOn: { $ne: null }, edd: { $ne: null, $gte: MIN_VALID_EDD }, $expr: { $gt: ['$deliveredOn', '$edd'] } },
+                { deliveredOn: null, edd: { $ne: null, $gte: MIN_VALID_EDD }, $expr: { $gt: [now, '$edd'] } },
+            ],
+        };
         const rtoMatch = { $or: [ { isRTO: true }, { status: { $in: ['RTO', 'RTD', 'rto', 'rtd'] } } ] };
 
         const pipeline: Record<string, unknown>[] = [
@@ -324,7 +475,26 @@ router.get('/insights', async (req: Request, res: Response) => {
                                 _id: { $ifNull: ['$destination', 'N/A'] },
                                 total: { $sum: 1 },
                                 delivered: { $sum: { $cond: [{ $ne: ['$deliveredOn', null] }, 1, 0] } },
-                                onTime: { $sum: { $cond: [{ $and: [{ $ne: ['$deliveredOn', null] }, { $ne: ['$slaBreach', true] }] }, 1, 0] } },
+                                onTime: {
+                                    $sum: {
+                                        $cond: [
+                                            {
+                                                $and: [
+                                                    { $ne: ['$deliveredOn', null] },
+                                                    {
+                                                        $or: [
+                                                            { $eq: ['$edd', null] },
+                                                            { $lt: ['$edd', MIN_VALID_EDD] },
+                                                            { $lte: ['$deliveredOn', '$edd'] },
+                                                        ],
+                                                    },
+                                                ],
+                                            },
+                                            1,
+                                            0,
+                                        ],
+                                    },
+                                },
                                 rto: { $sum: { $cond: [{ $or: [{ $eq: ['$isRTO', true] }, { $in: [{ $toUpper: { $ifNull: ['$status', ''] } }, ['RTO', 'RTD']] }] }, 1, 0] } },
                             },
                         },

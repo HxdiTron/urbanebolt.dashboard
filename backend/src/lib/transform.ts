@@ -246,21 +246,33 @@ function daysBetween(from: Date | null, to: Date | null): number | null {
     return (b - a) / (24 * 60 * 60 * 1000);
 }
 
+/** Reject dates before this (bad Excel/placeholder data would otherwise mark everything as breach) */
+const SLA_MIN_VALID_DATE = new Date('2019-01-01T00:00:00Z').getTime();
+
+function validForSLA(d: Date | null): Date | null {
+    if (d == null || Number.isNaN(d.getTime())) return null;
+    if (d.getTime() < SLA_MIN_VALID_DATE) return null;
+    return d;
+}
+
 /**
- * SLA logic:
+ * SLA logic (accurate; ignores invalid/placeholder dates):
  * - If deliveredOn <= edd → ON_TIME
- * - If deliveredOn > edd → BREACH
+ * - If deliveredOn > edd → BREACH (delivered late)
  * - If not delivered and today > edd → OPEN_BREACH
  * - Else → IN_PROGRESS
+ * EDD/deliveredOn before 2019 are treated as missing so bad data does not inflate breach counts.
  */
 export function computeSLA(
     deliveredOn: Date | null,
     edd: Date | null,
     today: Date
 ): { slaStatus: SLAStatus; slaBreach: boolean } {
-    if (deliveredOn) {
-        if (edd) {
-            const breach = deliveredOn.getTime() > edd.getTime();
+    const safeEdd = validForSLA(edd);
+    const safeDelivered = validForSLA(deliveredOn);
+    if (safeDelivered) {
+        if (safeEdd) {
+            const breach = safeDelivered.getTime() > safeEdd.getTime();
             return {
                 slaStatus: breach ? 'BREACH' : 'ON_TIME',
                 slaBreach: breach,
@@ -268,7 +280,7 @@ export function computeSLA(
         }
         return { slaStatus: 'ON_TIME', slaBreach: false };
     }
-    if (edd && today.getTime() > edd.getTime()) {
+    if (safeEdd && today.getTime() > safeEdd.getTime()) {
         return { slaStatus: 'OPEN_BREACH', slaBreach: true };
     }
     return { slaStatus: 'IN_PROGRESS', slaBreach: false };
