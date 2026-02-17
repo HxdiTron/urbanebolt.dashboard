@@ -14,6 +14,9 @@ let summaryCache: CacheEntry<DashboardSummary> | null = null;
 
 export interface DashboardSummary {
     totalShipments: number;
+    deliveredCount: number;
+    rtoCount: number;
+    inTransitCount: number;
     slaPercentage: number;
     breachCount: number;
     openBreachCount: number;

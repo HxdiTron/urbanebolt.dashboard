@@ -553,7 +553,7 @@
                     <div class="flex-1">
                         <h3 class="text-sm font-bold text-rose-900">Failure Bucket Alert</h3>
                         <p class="text-xs text-rose-700 mt-1">
-                            <span id="failureBucketCount">0</span> shipments require attention:
+                            <span id="failureBucketCount">0</span> shipments require attention<span id="failureBucketScope" class="font-medium"></span>:
                             <span id="failureBucketDetails" class="font-medium"></span>
                         </p>
                         <button onclick="setStatusFilter('FAILURE')" class="mt-2 px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition-all">
@@ -649,12 +649,19 @@
                     </table>
                 </div>
                 
-                <div id="tableFooter" class="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-between items-center text-xs text-slate-500 hidden">
+                <div id="tableFooter" class="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-wrap justify-between items-center gap-2 text-xs text-slate-500 hidden">
                     <span id="tableStatus">0 shipments</span>
-                    <div id="pagination" class="flex items-center gap-2">
-                        <button onclick="prevPage()" id="prevBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Previous</button>
-                        <span id="pageInfo">Page 1 of 1</span>
-                        <button onclick="nextPage()" id="nextBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Next</button>
+                    <div class="flex items-center gap-3">
+                        <div id="pagination" class="flex items-center gap-2">
+                            <button onclick="prevPage()" id="prevBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Previous</button>
+                            <span id="pageInfo">Page 1 of 1</span>
+                            <button onclick="nextPage()" id="nextBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Next</button>
+                        </div>
+                        <div id="serverPagination" class="hidden flex items-center gap-2 border-l border-slate-200 pl-3">
+                            <button onclick="prevServerPage()" id="prevServerBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Prev page</button>
+                            <span id="serverPageInfo">Server page 1</span>
+                            <button onclick="nextServerPage()" id="nextServerBtn" class="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed">Next page</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -690,6 +697,8 @@
             shipmentsLoading: false,
             trackedAwbs: new Set(),
             insightsPanelOpen: false,
+            /** Server-side cursor pagination: { pages: [{ shipments, nextAfter }], pageIndex, totalApprox? } */
+            serverPagination: null,
         };
 
         // =====================================================
@@ -965,10 +974,11 @@
         }
 
         // =====================================================
-        // LOAD SHIPMENTS FROM MONGODB (source of truth – fetches ALL in chunks)
+        // LOAD SHIPMENTS FROM MONGODB (server-side pagination: one page per request, Vercel-safe)
         // =====================================================
+        const SERVER_PAGE_SIZE = 100;
         async function loadShipmentsFromMongo() {
-            if (typeof API === 'undefined' || !API.getAllShipmentsFromMongo) return false;
+            if (typeof API === 'undefined' || !API.getShipmentsPage) return false;
             const config = API.getConfig && API.getConfig();
             if (!config || !config.baseUrl) return false;
             if (State.shipmentsLoading) return false;
@@ -979,40 +989,38 @@
                 loadBtn.disabled = true;
                 loadBtn.innerHTML = '<iconify-icon icon="solar:refresh-linear" width="14" class="animate-spin"></iconify-icon> Loading...';
             }
-            showTableLoading('Loading shipments...');
+            showTableLoading('Loading first page...');
 
             try {
-                const data = await API.getAllShipmentsFromMongo({
-                    chunkSize: 5000,
-                    onProgress: function (loaded, total) {
-                        const msg = total ? `Loading shipments... ${loaded.toLocaleString()} / ${total.toLocaleString()}` : `Loading shipments... ${loaded.toLocaleString()}`;
-                        showTableLoading(msg);
-                    },
-                });
+                const data = await API.getShipmentsPage({ limit: SERVER_PAGE_SIZE, includeTotal: true });
                 const list = (data.shipments || []).map(mongoDocToShipment).filter(s => s && s.awb);
                 State.shipments = list;
+                State.filteredShipments = list;
+                State.serverPagination = {
+                    pages: [{ shipments: list, nextAfter: data.nextAfter || null }],
+                    pageIndex: 0,
+                    totalApprox: data.total != null ? data.total : undefined,
+                };
+                State.currentPage = 1;
                 State.trackedAwbs = new Set(list.map(s => s.awb));
                 sortShipmentsByDate();
                 try {
-                    DataLayer.saveCache(State.shipments);
                     DataLayer.updateLastSync();
-                } catch (e) {
-                    console.warn('[Mongo] Failed to cache', e);
-                }
+                } catch (e) {}
                 updateFilterDropdowns();
                 clearFilters();
                 applyFiltersAndRender();
                 updateLastSyncDisplay();
                 await loadDashboardSummary();
                 if (list.length > 0) {
-                    showToast(`Loaded ${list.length.toLocaleString()} shipments from server`, 'success');
+                    showToast(`Loaded page 1 (${list.length} shipments). Use Next page for more.`, 'success');
                 }
                 return true;
             } catch (e) {
-                console.warn('[Mongo] Load failed, using cache if available:', e.message || e);
+                console.warn('[Mongo] Load failed:', e.message || e);
                 showTableLoading(State.shipments.length ? 'Using cached data. Load failed: ' + (e.message || e) : 'Load failed. Try again or check connection.');
                 if (e.status === 404 || e.status === 405 || (e.message && (e.message.includes('404') || e.message.includes('405')))) {
-                    showToast('Dashboard API not available. Start the backend (npm run dev:api in backend/) and open this page from the same URL (e.g. http://localhost:3000).', 'error');
+                    showToast('Dashboard API not available. Check backend and open from same origin.', 'error');
                 }
                 if (State.shipments.length > 0) applyFiltersAndRender();
                 return false;
@@ -1023,6 +1031,42 @@
                     loadBtn.innerHTML = '<iconify-icon icon="solar:database-linear" width="14"></iconify-icon> Load from server';
                 }
             }
+        }
+
+        async function nextServerPage() {
+            if (!State.serverPagination || !API.getShipmentsPage) return;
+            const cur = State.serverPagination.pages[State.serverPagination.pageIndex];
+            if (!cur || !cur.nextAfter) return;
+            const loadBtn = document.getElementById('nextServerBtn');
+            if (loadBtn) loadBtn.disabled = true;
+            showTableLoading('Loading next page...');
+            try {
+                const data = await API.getShipmentsPage({ limit: SERVER_PAGE_SIZE, after: cur.nextAfter });
+                const list = (data.shipments || []).map(mongoDocToShipment).filter(s => s && s.awb);
+                State.serverPagination.pages.push({ shipments: list, nextAfter: data.nextAfter || null });
+                State.serverPagination.pageIndex = State.serverPagination.pages.length - 1;
+                State.shipments = list;
+                State.filteredShipments = list;
+                State.currentPage = 1;
+                applyFiltersAndRender();
+                updateLastSyncDisplay();
+                if (list.length > 0) showToast(`Loaded page ${State.serverPagination.pageIndex + 1} (${list.length} rows)`, 'success');
+            } catch (e) {
+                console.warn('[Mongo] Next page failed:', e.message || e);
+                showToast('Failed to load next page: ' + (e.message || e), 'error');
+            } finally {
+                if (loadBtn) loadBtn.disabled = false;
+            }
+        }
+
+        function prevServerPage() {
+            if (!State.serverPagination || State.serverPagination.pageIndex <= 0) return;
+            State.serverPagination.pageIndex--;
+            const page = State.serverPagination.pages[State.serverPagination.pageIndex];
+            State.shipments = page.shipments;
+            State.filteredShipments = page.shipments;
+            State.currentPage = 1;
+            applyFiltersAndRender();
         }
 
         /**
@@ -1076,19 +1120,28 @@
                 if (getKpiEl('kpi-dsr')) getKpiEl('kpi-dsr').textContent = '...';
                 const s = await API.getDashboardSummary();
                 const totalShipments = Number(s.totalShipments) || 0;
+                const deliveredCount = Number(s.deliveredCount) ?? 0;
+                const rtoCount = Number(s.rtoCount) ?? 0;
+                const inTransitCount = Number(s.inTransitCount) ?? 0;
                 const slaPercentage = Number(s.slaPercentage) || 0;
                 const breachCount = Number(s.breachCount) || 0;
                 const openBreachCount = Number(s.openBreachCount) || 0;
                 const revenueAtRisk = Number(s.revenueAtRisk) || 0;
-                const rtoPercentage = Number(s.rtoPercentage) || 0;
 
                 if (getKpiEl('kpi-total')) getKpiEl('kpi-total').textContent = totalShipments.toLocaleString();
+                if (getKpiEl('kpi-delivered')) getKpiEl('kpi-delivered').textContent = deliveredCount.toLocaleString();
+                if (getKpiEl('kpi-intransit')) getKpiEl('kpi-intransit').textContent = inTransitCount.toLocaleString();
+                if (getKpiEl('kpi-exceptions')) getKpiEl('kpi-exceptions').textContent = rtoCount.toLocaleString();
                 if (getKpiEl('kpi-dsr')) getKpiEl('kpi-dsr').textContent = slaPercentage + '%';
                 if (getKpiEl('kpi-delayed')) getKpiEl('kpi-delayed').textContent = openBreachCount.toLocaleString();
                 if (getKpiEl('kpi-breach')) getKpiEl('kpi-breach').textContent = breachCount.toLocaleString();
                 if (getKpiEl('kpi-cod')) getKpiEl('kpi-cod').textContent = '₹' + revenueAtRisk.toLocaleString('en-IN');
-                if (getKpiEl('kpi-avgdelay')) getKpiEl('kpi-avgdelay').textContent = rtoPercentage + '% RTO';
-
+                if (getKpiEl('kpi-avgdelay')) getKpiEl('kpi-avgdelay').textContent = '-- days';
+                const badge = getKpiEl('exceptionBadge');
+                if (badge) {
+                    if (rtoCount > 0) { badge.textContent = rtoCount; badge.classList.remove('hidden'); }
+                    else { badge.classList.add('hidden'); }
+                }
                 if (typeof Chart !== 'undefined' && getKpiEl('summaryChartCanvas')) {
                     const other = Math.max(0, totalShipments - openBreachCount - breachCount);
                     const legendEl = getKpiEl('summaryChartLegend');
@@ -3289,9 +3342,13 @@
             const failures = State.shipments.filter(s => s.isInFailureBucket);
             const alertEl = document.getElementById('failureBucketAlert');
             const countEl = document.getElementById('failureBucketCount');
+            const scopeEl = document.getElementById('failureBucketScope');
             const detailsEl = document.getElementById('failureBucketDetails');
             const chipCountEl = document.getElementById('failureChipCount');
-            
+            const onThisPage = State.serverPagination && State.serverPagination.pages && State.serverPagination.pages.length > 0;
+            if (scopeEl) scopeEl.textContent = onThisPage ? ' (on this page)' : '';
+            if (scopeEl) scopeEl.style.fontWeight = 'normal';
+
             if (failures.length > 0) {
                 // Count by reason
                 const delayed = failures.filter(s => s.isDelayed).length;
@@ -3511,9 +3568,11 @@
                 container.innerHTML = '<p class="text-sm text-slate-500 col-span-full self-center">Load shipment data first to see insights.</p>';
                 return;
             }
+            const fromCurrentPage = State.serverPagination && State.serverPagination.pages && State.serverPagination.pages.length > 0;
             const { topDelayedCustomers, rtoByCustomer, statusDistribution, topReasons, worstOrigins, worstDestinations, dayDistribution, regionalPerformance, avgTatDays, avgPkdToOfdDays, avgOfdToDdlDays } = insights;
             const cards = [];
             const truncate = (s, len) => (s.length <= len ? s : s.slice(0, len) + '\u2026');
+            if (fromCurrentPage) cards.push(`<div class="insight-card col-span-full bg-amber-50 border border-amber-200 rounded-xl p-3 flex-shrink-0"><p class="text-xs text-amber-800"><strong>Note:</strong> Charts below are based on the current page of shipments (${State.shipments.length} rows), not the full database.</p></div>`);
 
             if (regionalPerformance && regionalPerformance.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-teal-800 uppercase tracking-wide mb-3">Regional delivery performance</h4><p class="text-[10px] text-slate-500 mb-2">On-time % by destination (min 10 shipments)</p><div class="h-56"><canvas id="insightChartRegion"></canvas></div><p class="text-[9px] text-slate-400 mt-2 flex items-center gap-3"><span><span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span> Good (≥80%)</span><span><span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span> Mid (50–80%)</span><span><span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span> Poor (&lt;50%)</span></p></div>`);
             if (topDelayedCustomers.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-amber-800 uppercase tracking-wide mb-3">Top delayed customers</h4><div class="h-48"><canvas id="insightChartDelayed"></canvas></div></div>`);
@@ -3521,9 +3580,9 @@
             if (statusDistribution.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Status mix</h4><div class="h-52 flex items-center justify-center"><canvas id="insightChartStatus"></canvas></div></div>`);
             if (topReasons.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-orange-800 uppercase tracking-wide mb-3">Delay / failure reasons</h4><div class="h-48"><canvas id="insightChartReasons"></canvas></div></div>`);
             if (worstOrigins.length > 0 || worstDestinations.length > 0) {
-                const hubLabels = [...worstOrigins.map(([h]) => truncate(h,12)+' (O)'), ...worstDestinations.map(([h]) => truncate(h,12)+' (D)')];
-                const hubValues = [...worstOrigins.map(([,n]) => n), ...worstDestinations.map(([,n]) => n)];
-                cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-violet-800 uppercase tracking-wide mb-3">Hubs with most delays</h4><div class="h-40"><canvas id="insightChartHubs"></canvas></div></div>`);
+                const hubLabels = [...worstOrigins.map(([h]) => truncate(h, 14) + ' (Origin)'), ...worstDestinations.map(([h]) => truncate(h, 14) + ' (Dest)')];
+                const hubValues = [...worstOrigins.map(([, n]) => n), ...worstDestinations.map(([, n]) => n)];
+                cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-violet-800 uppercase tracking-wide mb-3">Hubs with most delays</h4><p class="text-[10px] text-slate-500 mb-1">Delays by origin / destination hub</p><div class="h-40"><canvas id="insightChartHubs"></canvas></div></div>`);
                 window._insightsHubData = { labels: hubLabels, values: hubValues };
             }
             if (dayDistribution && dayDistribution.length > 0) cards.push(`<div class="insight-card bg-white border border-slate-200 rounded-xl p-4 premium-shadow flex-shrink-0"><h4 class="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-3">Activity by day</h4><div class="h-48"><canvas id="insightChartPeak"></canvas></div></div>`);
@@ -3569,11 +3628,11 @@
             }
             if (topDelayedCustomers.length > 0) {
                 const ctx = document.getElementById('insightChartDelayed');
-                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: topDelayedCustomers.map(c => truncate(c.name,18)), datasets: [{ label: 'Delayed', data: topDelayedCustomers.map(c => c.count), backgroundColor: CHART_COLORS.delayed }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: topDelayedCustomers.map(c => truncate(c.name, 20)), datasets: [{ label: 'Delayed', data: topDelayedCustomers.map(c => c.count), backgroundColor: CHART_COLORS.delayed }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, title: { display: true, text: 'Delayed count' }, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
             }
             if (rtoByCustomer.length > 0) {
                 const ctx = document.getElementById('insightChartRto');
-                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: rtoByCustomer.map(c => truncate(c.name,18)), datasets: [{ label: 'RTO %', data: rtoByCustomer.map(c => parseFloat(c.pct)), backgroundColor: CHART_COLORS.rto }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true, max: 100 } } } }); window._insightsCharts.push(ch); }
+                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: rtoByCustomer.map(c => truncate(c.name, 20)), datasets: [{ label: 'RTO %', data: rtoByCustomer.map(c => parseFloat(c.pct)), backgroundColor: CHART_COLORS.rto }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, title: { display: true, text: 'RTO %' }, beginAtZero: true, max: 100 } } } }); window._insightsCharts.push(ch); }
             }
             if (statusDistribution.length > 0) {
                 const ctx = document.getElementById('insightChartStatus');
@@ -3581,11 +3640,39 @@
             }
             if (topReasons.length > 0) {
                 const ctx = document.getElementById('insightChartReasons');
-                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: topReasons.map(r => truncate(r.reason,14)), datasets: [{ label: 'Count', data: topReasons.map(r => r.count), backgroundColor: CHART_COLORS.reasons }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
+                const reasonLabels = topReasons.map(r => truncate(r.reason, 22));
+                const reasonFull = topReasons.map(r => r.reason);
+                if (ctx) {
+                    const ch = new Chart(ctx.getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: reasonLabels, datasets: [{ label: 'Count', data: topReasons.map(r => r.count), backgroundColor: CHART_COLORS.reasons }] },
+                        options: {
+                            ...chartDefaults,
+                            indexAxis: 'y',
+                            scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, title: { display: true, text: 'Count' }, beginAtZero: true } },
+                            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { title: function(ctx) { const i = ctx[0].dataIndex; return reasonFull[i] != null ? reasonFull[i] : ctx[0].label; } } } },
+                        },
+                    });
+                    window._insightsCharts.push(ch);
+                }
             }
             if (window._insightsHubData) {
                 const ctx = document.getElementById('insightChartHubs');
-                if (ctx) { const ch = new Chart(ctx.getContext('2d'), { type: 'bar', data: { labels: window._insightsHubData.labels, datasets: [{ label: 'Delays', data: window._insightsHubData.values, backgroundColor: CHART_COLORS.hubs }] }, options: { ...chartDefaults, indexAxis: 'y', scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, beginAtZero: true } } } }); window._insightsCharts.push(ch); }
+                const hubLabels = window._insightsHubData.labels;
+                const hubValues = window._insightsHubData.values;
+                if (ctx) {
+                    const ch = new Chart(ctx.getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: hubLabels, datasets: [{ label: 'Delays', data: hubValues, backgroundColor: CHART_COLORS.hubs }] },
+                        options: {
+                            ...chartDefaults,
+                            indexAxis: 'y',
+                            scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, title: { display: true, text: 'Number of delays' }, beginAtZero: true } },
+                            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { afterLabel: function(ctx) { return 'Delays: ' + (hubValues[ctx.dataIndex] ?? ctx.parsed.x); } } } },
+                        },
+                    });
+                    window._insightsCharts.push(ch);
+                }
                 window._insightsHubData = null;
             }
             if (dayDistribution && dayDistribution.length > 0) {
@@ -3692,28 +3779,29 @@
                 ? Math.round(delayedShipments.reduce((sum, s) => sum + Math.abs(s.delayedDays), 0) / delayedShipments.length)
                 : 0;
 
-            // Primary KPIs
-            document.getElementById('kpi-total').textContent = total.toLocaleString();
-            document.getElementById('kpi-delivered').textContent = delivered.toLocaleString();
-            document.getElementById('kpi-intransit').textContent = inTransit.toLocaleString();
-            document.getElementById('kpi-exceptions').textContent = exceptions.toLocaleString();
-            
-            // SLA KPIs
-            document.getElementById('kpi-dsr').textContent = onTimeRate + '%';
-            document.getElementById('kpi-delayed').textContent = delayedCount.toLocaleString();
-            document.getElementById('kpi-breach').textContent = breachCount.toLocaleString();
-            document.getElementById('kpi-cod').textContent = '₹' + codValue.toLocaleString('en-IN');
-            document.getElementById('kpi-avgdelay').textContent = avgDelay > 0 ? `-${avgDelay} days` : '-- days';
-
-            // Update exception badge
-            const badge = document.getElementById('exceptionBadge');
-            if (exceptions > 0) {
-                badge.textContent = exceptions;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
+            // When using server-side pagination, KPIs are driven by the summary API (full DB) — don't overwrite with current-page counts
+            const kpisFromSummary = State.serverPagination && State.serverPagination.pages && State.serverPagination.pages.length > 0;
+            if (!kpisFromSummary) {
+                // Primary KPIs
+                document.getElementById('kpi-total').textContent = total.toLocaleString();
+                document.getElementById('kpi-delivered').textContent = delivered.toLocaleString();
+                document.getElementById('kpi-intransit').textContent = inTransit.toLocaleString();
+                document.getElementById('kpi-exceptions').textContent = exceptions.toLocaleString();
+                // SLA KPIs
+                document.getElementById('kpi-dsr').textContent = onTimeRate + '%';
+                document.getElementById('kpi-delayed').textContent = delayedCount.toLocaleString();
+                document.getElementById('kpi-breach').textContent = breachCount.toLocaleString();
+                document.getElementById('kpi-cod').textContent = '₹' + codValue.toLocaleString('en-IN');
+                document.getElementById('kpi-avgdelay').textContent = avgDelay > 0 ? `-${avgDelay} days` : '-- days';
+                // Exception badge
+                const badge = document.getElementById('exceptionBadge');
+                if (exceptions > 0) {
+                    badge.textContent = exceptions;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
             }
-
         }
 
         // =====================================================
@@ -3794,12 +3882,34 @@
 
             // Update footer
             footer.classList.remove('hidden');
-            document.getElementById('tableStatus').textContent = `Showing ${start + 1}-${Math.min(end, data.length)} of ${data.length} shipments`;
+            const serverDiv = document.getElementById('serverPagination');
+            const prevServerBtn = document.getElementById('prevServerBtn');
+            const nextServerBtn = document.getElementById('nextServerBtn');
+            const serverPageInfo = document.getElementById('serverPageInfo');
+            if (State.serverPagination) {
+                if (serverDiv) serverDiv.classList.remove('hidden');
+                const sp = State.serverPagination;
+                const curPage = sp.pages[sp.pageIndex];
+                const hasNext = curPage && curPage.nextAfter;
+                if (prevServerBtn) prevServerBtn.disabled = sp.pageIndex <= 0;
+                if (nextServerBtn) nextServerBtn.disabled = !hasNext;
+                if (serverPageInfo) serverPageInfo.textContent = sp.totalApprox != null
+                    ? `Page ${sp.pageIndex + 1} of ~${Math.ceil(sp.totalApprox / SERVER_PAGE_SIZE)} (${sp.totalApprox.toLocaleString()} total)`
+                    : `Server page ${sp.pageIndex + 1}`;
+                document.getElementById('tableStatus').textContent = sp.totalApprox != null
+                    ? `Showing ${start + 1}-${Math.min(end, data.length)} of ${data.length} on this page (${sp.totalApprox.toLocaleString()} total in DB)`
+                    : `Showing ${start + 1}-${Math.min(end, data.length)} of ${data.length} on this page`;
+            } else {
+                if (serverDiv) serverDiv.classList.add('hidden');
+                document.getElementById('tableStatus').textContent = `Showing ${start + 1}-${Math.min(end, data.length)} of ${data.length} shipments`;
+            }
             document.getElementById('pageInfo').textContent = `Page ${State.currentPage} of ${totalPages}`;
             document.getElementById('prevBtn').disabled = State.currentPage === 1;
             document.getElementById('nextBtn').disabled = State.currentPage === totalPages;
 
-            subtitle.textContent = `${data.length} shipment${data.length !== 1 ? 's' : ''} tracked`;
+            subtitle.textContent = State.serverPagination && State.serverPagination.totalApprox != null
+                ? `${State.serverPagination.totalApprox.toLocaleString()} shipments in DB (${data.length} on this page)`
+                : `${data.length} shipment${data.length !== 1 ? 's' : ''} tracked`;
         }
 
         // Charts removed per latest requirement; KPIs and table remain active.

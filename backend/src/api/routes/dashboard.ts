@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
+import https from 'https';
+import http from 'http';
 import { query } from '../../db';
 import { logger } from '../../utils/logger';
 import { rateLimiter, concurrencyLimiter, circuitBreaker, trackingQueue } from '../../queue/tracking-queue';
@@ -7,6 +9,7 @@ import { connectDB } from '../../lib/mongo';
 import { getCachedSummary, setCachedSummary } from '../../lib/dashboard-cache';
 
 const router = Router();
+const POD_PROXY_TIMEOUT_MS = 15000;
 
 function toSafeDoc(doc: Record<string, unknown>): Record<string, unknown> {
     const d = { ...doc };
@@ -46,12 +49,43 @@ router.get('/shipments/:awb', async (req: Request, res: Response) => {
 
 // ============================================================
 // GET /api/v1/dashboard/shipments - List shipments (cursor)
-// Use ?after=ObjectIdHex for cursor-based pagination (no large skip).
+// Production: small pages, projection, no count in hot path, maxTimeMS.
+// Use ?limit=100&after=ObjectIdHex. includeTotal=1 for approximate total (slow).
 // ============================================================
+const LIST_PROJECTION = {
+    _id: 1,
+    awb: 1,
+    customer: 1,
+    origin: 1,
+    destination: 1,
+    bookingDate: 1,
+    edd: 1,
+    deliveredOn: 1,
+    status: 1,
+    invoiceValue: 1,
+    weight: 1,
+    pieces: 1,
+    isRTO: 1,
+    slaStatus: 1,
+    slaBreach: 1,
+    deliveryTAT: 1,
+    agingDays: 1,
+    uploadedAt: 1,
+    delPod: 1,
+    orderNumber: 1,
+};
+const MAX_TIME_MS = 8000;
+const DEFAULT_PAGE_LIMIT = 100;
+const MAX_PAGE_LIMIT = 500;
+
 router.get('/shipments', async (req: Request, res: Response) => {
     const rawLimit = Number(req.query.limit);
-    const limit = Math.min(200000, Math.max(1, Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : 10000));
+    const limit = Math.min(
+        MAX_PAGE_LIMIT,
+        Math.max(1, Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : DEFAULT_PAGE_LIMIT)
+    );
     const after = typeof req.query.after === 'string' && req.query.after.trim() ? req.query.after.trim() : null;
+    const includeTotal = req.query.includeTotal === '1' || req.query.includeTotal === 'true';
     try {
         const db = await connectDB();
         const coll = db.collection('shipments');
@@ -59,21 +93,38 @@ router.get('/shipments', async (req: Request, res: Response) => {
         if (after) {
             try {
                 const afterId = new ObjectId(after);
-                cursor = coll.find({ _id: { $lt: afterId } }).sort({ _id: -1 }).limit(limit);
+                cursor = coll
+                    .find({ _id: { $lt: afterId } })
+                    .sort({ _id: -1 })
+                    .limit(limit)
+                    .project(LIST_PROJECTION)
+                    .maxTimeMS(MAX_TIME_MS);
             } catch {
                 return res.status(400).json({ error: 'Invalid after cursor' });
             }
         } else {
-            cursor = coll.find({}).sort({ _id: -1 }).limit(limit);
+            cursor = coll
+                .find({})
+                .sort({ _id: -1 })
+                .limit(limit)
+                .project(LIST_PROJECTION)
+                .maxTimeMS(MAX_TIME_MS);
         }
         const shipments = await cursor.toArray();
-        const total = after ? 0 : await coll.countDocuments({});
+        let total: number | undefined;
+        if (includeTotal && !after) {
+            try {
+                total = await coll.estimatedDocumentCount({ maxTimeMS: 3000 });
+            } catch {
+                total = undefined;
+            }
+        }
         const list = shipments.map((doc: Record<string, unknown>) => toSafeDoc(doc));
         const last = shipments[shipments.length - 1];
         const nextAfter = last && last._id ? String((last as { _id: ObjectId })._id) : null;
         res.json({
             shipments: list,
-            ...(total >= 0 && !after ? { total } : {}),
+            ...(total !== undefined ? { total } : {}),
             ...(nextAfter ? { nextAfter } : {}),
         });
     } catch (err: unknown) {
@@ -124,9 +175,13 @@ router.get('/summary', async (req: Request, res: Response) => {
         const revenueAtRisk = result?.revenueAtRisk?.[0]?.sum ?? 0;
         const rtoCount = result?.rto?.[0]?.count ?? 0;
         const rtoPercentage = totalShipments > 0 ? Math.round((rtoCount / totalShipments) * 1000) / 10 : 0;
+        const inTransitCount = Math.max(0, totalShipments - deliveredCount - rtoCount);
 
         const summary = {
             totalShipments,
+            deliveredCount,
+            rtoCount,
+            inTransitCount,
             breachCount,
             openBreachCount,
             slaPercentage,
@@ -139,6 +194,49 @@ router.get('/summary', async (req: Request, res: Response) => {
         logger.error({ err }, 'Dashboard summary failed');
         res.status(500).json({
             error: 'Dashboard summary failed',
+            detail: err instanceof Error ? err.message : String(err),
+        });
+    }
+});
+
+// ============================================================
+// GET /api/v1/dashboard/pod - Proxy POD image so it loads in UI (avoids CORS / mixed content)
+// ============================================================
+router.get('/pod', async (req: Request, res: Response) => {
+    const rawUrl = typeof req.query.url === 'string' ? req.query.url.trim() : '';
+    if (!rawUrl || (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://'))) {
+        return res.status(400).json({ error: 'Invalid or missing url (must be http or https)' });
+    }
+    try {
+        const u = new URL(rawUrl);
+        if (['localhost', '127.0.0.1'].includes(u.hostname.toLowerCase())) {
+            return res.status(400).json({ error: 'POD proxy does not allow localhost' });
+        }
+        const lib = u.protocol === 'https:' ? https : http;
+        const chunks: Buffer[] = [];
+        await new Promise<void>((resolve, reject) => {
+            const clientReq = lib.get(rawUrl, { timeout: POD_PROXY_TIMEOUT_MS }, (response) => {
+                if (response.statusCode && response.statusCode >= 400) {
+                    reject(new Error(`Upstream returned ${response.statusCode}`));
+                    return;
+                }
+                const ct = response.headers['content-type'] || 'image/jpeg';
+                response.on('data', (chunk: Buffer) => chunks.push(chunk));
+                response.on('end', () => {
+                    res.setHeader('Content-Type', ct);
+                    res.setHeader('Cache-Control', 'private, max-age=86400');
+                    res.send(Buffer.concat(chunks));
+                    resolve();
+                });
+                response.on('error', reject);
+            });
+            clientReq.on('error', reject);
+            clientReq.on('timeout', () => { clientReq.destroy(); reject(new Error('Timeout')); });
+        });
+    } catch (err: unknown) {
+        logger.warn({ err, url: rawUrl }, 'POD proxy failed');
+        res.status(502).json({
+            error: 'Could not load POD image',
             detail: err instanceof Error ? err.message : String(err),
         });
     }

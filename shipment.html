@@ -168,6 +168,42 @@
             return '';
         }
 
+        /** Normalize a single scan for timeline (consistent field names). */
+        function normalizeScan(s) {
+            return {
+                statusCode: s.statusCode || '',
+                statusDateTime: s.statusDateTime || s.statusDate || s.scan_date || '',
+                statusDescription: s.statusDescription || s.statusCodeDescription || statusCodeToDisplayName(s.statusCode),
+                currentLocation: s.currentLocation || s.location || s.facility || s.hub || s.city || '',
+                reasonCodeDescription: s.reasonCodeDescription || s.reasonDescription || '',
+            };
+        }
+        /** Build scans from doc key dates when no scans array, then sort all scans chronologically (oldest first). Returns { scans, derivedFromDates }. */
+        function buildScansFromDoc(doc) {
+            const deliveredOn = doc.deliveredOn || '';
+            const status = (doc.status || '').toUpperCase();
+            const isRto = Boolean(doc.isRTO);
+            let list = [];
+            let derivedFromDates = false;
+            if (Array.isArray(doc.scans) && doc.scans.length > 0) {
+                list = doc.scans.map(normalizeScan);
+            } else {
+                derivedFromDates = true;
+                const entries = [];
+                const push = (code, dateStr, desc, location) => {
+                    if (dateStr) entries.push({ statusCode: code, statusDateTime: dateStr, statusDescription: desc, currentLocation: location || '', reasonCodeDescription: '' });
+                };
+                push('MAN', doc.manifestTime || doc.firstScanTime, 'Manifested', doc.origin);
+                push('PKD', doc.bookingDate || doc.pickupTime, 'Picked up', doc.origin);
+                push('OFD', doc.ofdTime, 'Out for delivery', doc.destination);
+                push(isRto ? 'RTD' : 'DDL', deliveredOn, isRto ? 'RTO Delivered' : 'Delivered', doc.destination);
+                list = entries.filter(e => e.statusDateTime);
+            }
+            const parse = (s) => (s && (new Date(s)).getTime()) || 0;
+            list.sort((a, b) => parse(a.statusDateTime) - parse(b.statusDateTime));
+            return { scans: list, derivedFromDates };
+        }
+
         /** Map MongoDB shipment doc (Excel upload) to tracking-API-like format for renderShipment */
         function mongoDocToTrackingFormat(doc) {
             const addedOn = doc.bookingDate || doc.uploadedAt || '';
@@ -177,19 +213,7 @@
             const status = (doc.status || '').toUpperCase();
             const isDelivered = !!deliveredOn || status === 'DDL' || status === 'DELIVERED' || status === 'RTD';
             const isRto = Boolean(doc.isRTO);
-            const scans = Array.isArray(doc.scans) && doc.scans.length > 0
-                ? doc.scans.map(s => ({
-                    statusCode: s.statusCode || '',
-                    statusDateTime: s.statusDateTime || s.statusDate || '',
-                    statusDescription: s.statusDescription || s.statusCodeDescription || statusCodeToDisplayName(s.statusCode),
-                    currentLocation: s.currentLocation || s.location || '',
-                    reasonCodeDescription: s.reasonCodeDescription || s.reasonDescription || '',
-                }))
-                : [];
-            if (scans.length === 0) {
-                if (doc.bookingDate) scans.push({ statusCode: 'PKD', statusDateTime: doc.bookingDate, statusDescription: 'Picked up', currentLocation: doc.origin || '' });
-                if (deliveredOn) scans.push({ statusCode: isRto ? 'RTD' : 'DDL', statusDateTime: deliveredOn, statusDescription: isRto ? 'RTO Delivered' : 'Delivered', currentLocation: doc.destination || '' });
-            }
+            const { scans, derivedFromDates } = buildScansFromDoc(doc);
             const currentStatusCode = isRto && isDelivered ? 'RTD' : isDelivered ? 'DDL' : (status || (isRto ? 'RTO' : ''));
             const currentStatusCodeDescription = statusCodeToDisplayName(currentStatusCode);
             return {
@@ -211,7 +235,8 @@
                 currentReasonCode: doc.reasonCode || '',
                 currentReasonCodeDescription: doc.reasonDescription || '',
                 delPod: resolveDelPod(doc),
-                scans: scans,
+                scans,
+                trackingDerivedFromDates: derivedFromDates,
             };
         }
 
@@ -375,6 +400,17 @@
             }
             return u;
         }
+        /** URL to use for <img> so POD loads in-page: same-origin use as-is, external use backend proxy to avoid CORS */
+        function podImageSrc(absolutePodUrl) {
+            if (!absolutePodUrl) return '';
+            const origin = window.location.origin;
+            try {
+                const u = new URL(absolutePodUrl, origin);
+                if (u.origin === origin) return absolutePodUrl;
+            } catch (_) { return absolutePodUrl; }
+            const base = (typeof API !== 'undefined' && API.getConfig && API.getConfig().baseUrl) ? API.getConfig().baseUrl : origin;
+            return (base.replace(/\/$/, '') + '/api/v1/dashboard/pod?url=' + encodeURIComponent(absolutePodUrl));
+        }
 
         function renderShipment(data) {
             const statusCode = data.currentStatusCode || '';
@@ -403,6 +439,7 @@
                 reasonCode: data.currentReasonCode || '',
                 reasonDescription: data.currentReasonCodeDescription || '',
                 scans: data.scans || [],
+                trackingDerivedFromDates: !!data.trackingDerivedFromDates,
                 ...lifecycle,
             };
             
@@ -468,10 +505,11 @@
                             </div>
                         </div>
                         
-                        <!-- Tracking History (detailed shipment timeline) -->
+                        <!-- Tracking History (detailed shipment timeline, oldest first) -->
                         <div class="bg-white rounded-xl premium-border premium-shadow p-6">
                             <h3 class="text-base font-bold text-slate-900 mb-1">Tracking History</h3>
-                            <p class="text-xs text-slate-500 mb-4">${shipment.scans.length} event${shipment.scans.length !== 1 ? 's' : ''}</p>
+                            <p class="text-xs text-slate-500 mb-1">${shipment.scans.length} event${shipment.scans.length !== 1 ? 's' : ''}${shipment.trackingDerivedFromDates ? ' (from key dates)' : ''}</p>
+                            ${shipment.trackingDerivedFromDates ? '<p class="text-[10px] text-slate-400 mb-2">Built from manifest, pickup, OFD and delivery dates in your data.</p>' : ''}
                             ${shipment.scans.length > 8 ? '<p class="text-[10px] text-slate-400 mb-2">Scroll to see all events</p>' : ''}
                             <div id="timeline" class="space-y-4 max-h-[32rem] overflow-y-auto pr-1">
                                 ${renderTimeline(shipment.scans)}
@@ -556,10 +594,10 @@
                             <h3 class="text-sm font-bold text-slate-900 mb-4">Proof of Delivery</h3>
                             ${shipment.delPod ? `
                             <div class="block">
-                                <img src="${escapeHtml(shipment.delPod)}" alt="Delivery POD" class="w-full rounded-lg border border-slate-200 hover:border-blue-400 transition-colors object-contain max-h-80 bg-slate-50" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n) n.style.display='block';">
-                                <p class="text-xs text-slate-500 p-4 text-center bg-slate-50 rounded-lg border border-slate-200" style="display:none;">Image could not be loaded. <a href="${escapeHtml(shipment.delPod)}" target="_blank" class="text-blue-600 font-medium">Open link</a></p>
+                                <img src="${escapeHtml(podImageSrc(shipment.delPod))}" alt="Proof of delivery" class="w-full rounded-lg border border-slate-200 hover:border-blue-400 transition-colors object-contain max-h-80 bg-slate-50" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n) n.style.display='block';">
+                                <p class="text-xs text-slate-500 p-4 text-center bg-slate-50 rounded-lg border border-slate-200" style="display:none;">Image could not be loaded. <a href="${escapeHtml(shipment.delPod)}" target="_blank" rel="noopener" class="text-blue-600 font-medium">Open link</a></p>
                             </div>
-                            <a href="${escapeHtml(shipment.delPod)}" target="_blank" class="mt-3 flex items-center justify-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                            <a href="${escapeHtml(shipment.delPod)}" target="_blank" rel="noopener" class="mt-3 flex items-center justify-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium">
                                 <iconify-icon icon="solar:gallery-wide-linear" width="14"></iconify-icon>
                                 View Full Image
                             </a>
@@ -609,7 +647,7 @@
             if (!scans || scans.length === 0) {
                 return '<p class="text-sm text-slate-400">No tracking history available</p>';
             }
-            const ordered = [...scans].reverse();
+            const ordered = [...scans].sort((a, b) => (new Date(a.statusDateTime || 0)).getTime() - (new Date(b.statusDateTime || 0)).getTime());
 
             return ordered.map((scan, i) => {
                 const desc = scanVal(scan, ['statusDescription', 'statusCodeDescription', 'status_code_description', 'status_description', 'description']) || statusCodeToDisplayName(scanVal(scan, ['statusCode', 'status_code'])) || 'Update';

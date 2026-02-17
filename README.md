@@ -126,6 +126,15 @@ The dashboard enforces strict rate limits to protect your API:
    - Amber: 50-80% of rate limit used
    - Red: > 80% or circuit breaker open
 
+## Production scalability (100k+ shipments)
+
+The dashboard uses **server-side cursor pagination** so it works on Vercel (10–60s serverless timeout) and with large MongoDB collections:
+
+- **Backend** (`GET /api/v1/dashboard/shipments`): Returns one page (default 100, max 500) per request. Uses `?limit=&after=` (cursor). Optional `includeTotal=1` returns approximate total via `estimatedDocumentCount` (max 3s). Response is limited to needed fields (projection) and `maxTimeMS(8000)` keeps the query within platform limits.
+- **Frontend**: "Load from server" loads the first page only. "Next page" / "Prev page" fetch the next cursor or show the previous cached page. No single request loads the full collection.
+- **MongoDB**: List query uses `sort({ _id: -1 })` and cursor `_id: { $lt: afterId }`; `_id` is indexed by default. Ensure indexes from `ensureShipmentIndexes()` (awb, bookingDate, customer, etc.) for other queries.
+- **Trade-offs**: Filters (status, origin, etc.) apply only to the current page. For collection-wide filters you’d add server-side filter query params later. Summary KPIs come from the cached `/summary` endpoint (aggregation), not from the list response.
+
 ## Production Deployment
 
 For production, consider:

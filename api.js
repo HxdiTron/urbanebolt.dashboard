@@ -536,20 +536,21 @@ const API = (() => {
         if (!CONFIG.baseUrl) {
             throw new Error('API not configured. Call API.configure({ baseUrl: "..." }) first.');
         }
-        const limit = Math.min(200000, Math.max(1, Math.floor(Number(options.limit)) || 10000));
+        const limit = Math.min(500, Math.max(1, Math.floor(Number(options.limit)) || 100));
         const after = options.after && String(options.after).trim() ? String(options.after).trim() : '';
-        const url = after
-            ? `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments?limit=${limit}&after=${encodeURIComponent(after)}`
-            : `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments?limit=${limit}`;
+        const includeTotal = options.includeTotal === true || options.includeTotal === '1';
+        let url = `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/shipments?limit=${limit}`;
+        if (after) url += `&after=${encodeURIComponent(after)}`;
+        if (includeTotal) url += '&includeTotal=1';
         const controller = new AbortController();
-        const timeoutMs = 28000;
+        const timeoutMs = 15000;
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         let response;
         try {
             response = await fetch(url, { signal: controller.signal });
         } catch (e) {
             clearTimeout(timeoutId);
-            if (e && e.name === 'AbortError') throw new Error('Shipments request timed out. Server may have a short timeout (e.g. Vercel 10–60s). Try loading again or use a smaller chunk.');
+            if (e && e.name === 'AbortError') throw new Error('Request timed out. Try again or use Next/Prev page.');
             throw e;
         }
         clearTimeout(timeoutId);
@@ -574,12 +575,24 @@ const API = (() => {
     }
 
     /**
+     * Fetch one page of shipments (production: stays within Vercel/serverless timeout).
+     * Use for "Load from server" and "Next page". Returns { shipments, nextAfter, total? }.
+     */
+    async function getShipmentsPage(options) {
+        return getShipmentsFromMongo({
+            limit: options && options.limit != null ? options.limit : 100,
+            after: options && options.after ? options.after : undefined,
+            includeTotal: options && options.includeTotal === true,
+        });
+    }
+
+    /**
      * Fetch ALL shipments using cursor-based pagination (no large skip).
      * Calls onProgress(loaded, total) after each chunk. total from first response.
      */
     async function getAllShipmentsFromMongo(options) {
         options = options || {};
-        const CHUNK = Math.min(20000, Math.max(5000, Math.floor(Number(options.chunkSize)) || 10000));
+        const CHUNK = Math.min(20000, Math.max(500, Math.floor(Number(options.chunkSize)) || 2000));
         const onProgress = typeof options.onProgress === 'function' ? options.onProgress : function () {};
 
         if (!CONFIG.baseUrl) {
@@ -662,6 +675,7 @@ const API = (() => {
         batchFetch,
         uploadExcel,
         getShipmentsFromMongo,
+        getShipmentsPage,
         getAllShipmentsFromMongo,
         getShipmentByAwbFromMongo,
         getDashboardSummary,

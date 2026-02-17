@@ -56,6 +56,7 @@ export async function mongoHealthCheck(): Promise<{ ok: boolean; error?: string 
 
 /**
  * Ensure indexes on shipments collection for production performance.
+ * _id is indexed by default; list endpoint uses sort({ _id: -1 }) + cursor.
  */
 export async function ensureShipmentIndexes(): Promise<void> {
     const database = await connectDB();
