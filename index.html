@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f8fafc">
     <title>UrbaneBolt • Operations Dashboard</title>
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="shortcut icon" type="image/x-icon" href="assets/favicon.ico">
@@ -18,95 +19,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="api.js"></script>
     <script src="config.js"></script>
-    <style>
-        html { scroll-behavior: smooth; }
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
-        .insights-flow { overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
-        .insights-flow::-webkit-scrollbar { height: 8px; }
-        .insights-flow .insight-card { scroll-snap-align: start; scroll-snap-stop: normal; min-width: min(320px, 100%); }
-        @media (min-width: 1024px) { .insights-flow { overflow-x: visible; scroll-snap-type: none; } }
-        .premium-shadow { box-shadow: 0 2px 10px rgba(0,0,0,0.02), 0 10px 25px rgba(0,0,0,0.03); }
-        .premium-border { border: 1px solid #e2e8f0; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        .status-delivered { background-color: #d1fae5; color: #047857; }
-        .status-intransit { background-color: #dbeafe; color: #1d4ed8; }
-        .status-ofd { background-color: #fef3c7; color: #b45309; }
-        .status-rto { background-color: #fee2e2; color: #dc2626; }
-        .status-ndr { background-color: #ffedd5; color: #c2410c; }
-        .status-cancelled { background-color: #f1f5f9; color: #475569; }
-        .row-delivered { border-left: 3px solid #10b981; }
-        .row-intransit { border-left: 3px solid #3b82f6; }
-        .row-ofd { border-left: 3px solid #f59e0b; }
-        .row-exception { border-left: 3px solid #ef4444; }
-        
-        /* Filter Chips */
-        .status-chip {
-            background-color: #f1f5f9;
-            color: #64748b;
-            border: 1px solid transparent;
-        }
-        .status-chip:hover {
-            background-color: #e2e8f0;
-            color: #475569;
-        }
-        .status-chip.active {
-            background-color: #1e293b;
-            color: white;
-            border-color: #1e293b;
-        }
-        .status-chip.failure-chip:hover {
-            background-color: #fef2f2;
-            border-color: #fecaca;
-            color: #dc2626;
-        }
-        .status-chip.failure-chip.active {
-            background-color: #dc2626;
-            border-color: #dc2626;
-            color: white;
-        }
-        
-        /* Delay indicator styles */
-        .delay-positive { color: #059669; background-color: #d1fae5; }
-        .delay-negative { color: #dc2626; background-color: #fee2e2; font-weight: 600; }
-        .delay-neutral { color: #64748b; background-color: #f1f5f9; }
-        
-        /* SLA Badge styles */
-        .sla-ontime { background-color: #d1fae5; color: #047857; }
-        .sla-delayed { background-color: #fee2e2; color: #dc2626; }
-        .sla-breach { background-color: #fef3c7; color: #b45309; }
-        .sla-critical { background: linear-gradient(135deg, #fee2e2, #fef3c7); color: #dc2626; animation: pulse 2s infinite; }
-        
-        .dashboard-scroll { scroll-behavior: smooth; }
-        /* Row highlight for failures */
-        .row-failure { 
-            background-color: #fef2f2 !important; 
-            border-left: 3px solid #dc2626;
-        }
-        .row-breach {
-            background-color: #fffbeb !important;
-            border-left: 3px solid #f59e0b;
-        }
-        
-        /* Select dropdown styling */
-        select {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 0.5rem center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-            padding-right: 2.5rem;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/dashboard-ui.css">
 </head>
-<body class="text-slate-600 antialiased h-screen flex overflow-hidden">
+<body class="text-slate-600 antialiased h-screen flex overflow-x-hidden min-w-0">
 
-    <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between z-20 hidden lg:flex">
+    <!-- Mobile overlay (tap to close sidebar) -->
+    <div id="sidebarOverlay" class="sidebar-overlay fixed inset-0 bg-slate-900/40 z-30 lg:hidden" aria-hidden="true" onclick="closeMobileSidebar()"></div>
+
+    <!-- Sidebar: desktop visible on lg; mobile drawer -->
+    <aside id="sidebar" class="sidebar-drawer fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 flex flex-col justify-between z-40 lg:relative lg:z-20 lg:translate-x-0" aria-label="Main navigation">
         <div>
             <div class="h-16 flex items-center px-5 border-b border-slate-100">
                 <div class="flex items-center gap-3">
@@ -123,7 +44,7 @@
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Dashboard</p>
                 </div>
                 
-                <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg bg-slate-900 text-white">
+                <a href="index.html" onclick="closeMobileSidebar()" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg bg-slate-900 text-white min-h-[44px]">
                     <iconify-icon icon="solar:widget-2-linear" width="18"></iconify-icon>
                     Overview
                 </a>
@@ -132,12 +53,12 @@
                     <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Finance & NDR</p>
                 </div>
 
-                <a href="cod.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
+                <a href="cod.html" onclick="closeMobileSidebar()" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600 min-h-[44px]">
                     <iconify-icon icon="solar:bill-list-linear" width="18"></iconify-icon>
                     COD Reconciliation
                 </a>
                 
-                <a href="exceptions.html" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600">
+                <a href="exceptions.html" onclick="closeMobileSidebar()" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg hover:bg-slate-50 text-slate-600 min-h-[44px]">
                     <iconify-icon icon="solar:danger-triangle-linear" width="18"></iconify-icon>
                     RTO & Exceptions
                     <span id="exceptionBadge" class="ml-auto bg-rose-100 text-rose-600 py-0.5 px-2 rounded-full text-[10px] font-semibold hidden">0</span>
@@ -157,13 +78,17 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 min-w-0">
         
         <!-- Top Bar -->
-        <header class="bg-white border-b border-slate-200 px-6 py-4">
-            <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-4">
-                    <h1 class="text-xl font-bold text-slate-900">Operations Dashboard</h1>
+        <header class="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex-shrink-0">
+            <div class="flex items-center justify-between mb-4 gap-2">
+                <div class="flex items-center gap-2 sm:gap-4 min-w-0">
+                    <!-- Mobile menu button (min 44px touch target) -->
+                    <button type="button" id="menuBtn" class="touch-target lg:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300" onclick="openMobileSidebar()" aria-label="Open menu">
+                        <iconify-icon icon="solar:hamburger-menu-linear" width="24"></iconify-icon>
+                    </button>
+                    <h1 class="text-lg sm:text-xl font-bold text-slate-900 truncate">Operations Dashboard</h1>
                     <div id="connectionStatus" class="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-500">
                         <span class="w-2 h-2 rounded-full bg-slate-400"></span>
                         <span>Initializing...</span>
@@ -181,16 +106,16 @@
             
             <!-- Manual AWB Search & Excel Upload -->
             <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3 header-actions">
                     <!-- Single AWB Search -->
-                    <div class="relative flex-1 min-w-[200px] max-w-sm">
+                    <div class="relative flex-1 min-w-0 w-full sm:min-w-[200px] sm:max-w-sm">
                         <iconify-icon icon="solar:magnifer-linear" width="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
                         <input type="text" id="awbSearchInput" 
                             placeholder="Search AWB..." 
-                            class="w-full text-sm bg-slate-50 border-0 rounded-lg pl-9 pr-4 py-2.5 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all">
+                            class="w-full text-sm bg-slate-50 border-0 rounded-lg pl-9 pr-4 py-3 sm:py-2.5 font-mono placeholder:font-sans focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all min-h-[44px]">
                     </div>
                     <button onclick="trackSingleAWB()" id="trackBtn"
-                        class="px-4 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 flex items-center gap-2 transition-all">
+                        class="min-h-[44px] px-4 py-2.5 text-sm font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 flex items-center gap-2 transition-all touch-target">
                         <iconify-icon icon="solar:magnifer-linear" width="14"></iconify-icon>
                         Search
                     </button>
@@ -227,7 +152,7 @@
                 </div>
                 
                 <!-- Excel Upload Progress/Preview (Hidden by default) -->
-                <div id="excelUploadPanel" class="hidden mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <div id="excelUploadPanel" class="excel-panel mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
                     <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center gap-2">
                             <iconify-icon icon="solar:file-check-linear" width="20" class="text-emerald-600"></iconify-icon>
@@ -431,8 +356,8 @@
             </div>
         </header>
 
-        <!-- Scrollable Dashboard Area -->
-        <div id="dashboardScroll" class="dashboard-scroll flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6">
+        <!-- Scrollable Dashboard Area (momentum scroll, no horizontal overflow) -->
+        <div id="dashboardScroll" class="dashboard-scroll u-scroll-y flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-6 min-h-0">
             
             <!-- KPI Cards -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -566,17 +491,17 @@
                 </div>
             </div>
 
-            <!-- Data Insights (not visible directly in table) -->
+            <!-- Data Insights (expandable with smooth animation) -->
             <div id="insightsSection" class="bg-white rounded-xl premium-border premium-shadow overflow-hidden scroll-mt-6">
-                <button id="insightsToggle" type="button" onclick="toggleInsightsPanel()" class="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/80 transition-colors">
+                <button id="insightsToggle" type="button" onclick="toggleInsightsPanel()" class="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/80 transition-colors min-h-[44px] touch-target" aria-expanded="false" aria-controls="insightsPanel">
                     <span class="flex items-center gap-2">
                         <iconify-icon icon="solar:chart-2-linear" width="20" class="text-indigo-500"></iconify-icon>
                         <span class="text-sm font-bold text-slate-800">Data insights</span>
-                        <span class="text-xs text-slate-500 font-normal">(patterns not visible in the table)</span>
+                        <span class="text-xs text-slate-500 font-normal hidden sm:inline">(patterns not visible in the table)</span>
                     </span>
-                    <iconify-icon id="insightsChevron" icon="solar:alt-arrow-down-linear" width="18" class="text-slate-400 transition-transform"></iconify-icon>
+                    <iconify-icon id="insightsChevron" icon="solar:alt-arrow-down-linear" width="18" class="text-slate-400 insights-chevron"></iconify-icon>
                 </button>
-                <div id="insightsPanel" class="hidden border-t border-slate-100">
+                <div id="insightsPanel" class="insights-panel-body border-t border-slate-100" role="region" aria-labelledby="insightsToggle">
                     <div id="insightsContent" class="p-5 insights-flow flex gap-5 pb-2 lg:flex-wrap lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:overflow-visible">
                         <!-- Filled by renderInsightsPanel() with charts -->
                     </div>
@@ -614,8 +539,8 @@
                     </div>
                 </div>
                 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
+                <div class="table-wrapper overflow-x-auto">
+                    <table class="w-full text-left min-w-[800px]">
                         <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
                                 <th class="py-3 px-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">AWB Number</th>
@@ -665,12 +590,10 @@
                     </div>
                 </div>
             </div>
-
-                            </div>
     </main>
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 hidden">
+    <!-- Loading Overlay (smooth fade) -->
+    <div id="loadingOverlay" class="loading-overlay fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50" aria-hidden="true">
         <div class="bg-white rounded-xl p-8 flex flex-col items-center shadow-2xl">
             <iconify-icon icon="solar:refresh-linear" width="40" class="text-blue-600 animate-spin mb-4"></iconify-icon>
             <p class="text-slate-900 font-semibold">Tracking Shipments...</p>
@@ -678,11 +601,11 @@
                 </div>
             </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    <!-- Toast Notification (smooth slide-up, safe area aware) -->
+    <div id="toast" class="toast-enter fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 z-50 min-h-[44px]">
         <iconify-icon id="toastIcon" icon="solar:check-circle-linear" width="20"></iconify-icon>
         <span id="toastMessage">Success</span>
-        </div>
+    </div>
 
     <script>
         // =====================================================
@@ -700,6 +623,24 @@
             /** Server-side cursor pagination: { pages: [{ shipments, nextAfter }], pageIndex, totalApprox? } */
             serverPagination: null,
         };
+
+        // =====================================================
+        // MOBILE SIDEBAR
+        // =====================================================
+        function openMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar) sidebar.classList.add('is-open');
+            if (overlay) { overlay.classList.add('is-visible'); overlay.setAttribute('aria-hidden', 'false'); }
+            document.body.style.overflow = 'hidden';
+        }
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar) sidebar.classList.remove('is-open');
+            if (overlay) { overlay.classList.remove('is-visible'); overlay.setAttribute('aria-hidden', 'true'); }
+            document.body.style.overflow = '';
+        }
 
         // =====================================================
         // PERSISTENT DATA LAYER (localStorage)
@@ -948,7 +889,7 @@
                 const lastSync = DataLayer.getLastSync();
                 if (lastSync > 0) {
                     const ago = formatTimeAgo(lastSync);
-                    showToast(`Loaded ${cachedShipments.length} shipments from cache`, 'info');
+                    // Loaded from cache (no toast)
                 }
             }
         }
@@ -1013,7 +954,7 @@
                 updateLastSyncDisplay();
                 await loadDashboardSummary();
                 if (list.length > 0) {
-                    showToast(`Loaded page 1 (${list.length} shipments). Use Next page for more.`, 'success');
+                    // Page 1 loaded (no toast)
                 }
                 return true;
             } catch (e) {
@@ -1050,7 +991,7 @@
                 State.currentPage = 1;
                 applyFiltersAndRender();
                 updateLastSyncDisplay();
-                if (list.length > 0) showToast(`Loaded page ${State.serverPagination.pageIndex + 1} (${list.length} rows)`, 'success');
+                // Next page loaded (no toast)
             } catch (e) {
                 console.warn('[Mongo] Next page failed:', e.message || e);
                 showToast('Failed to load next page: ' + (e.message || e), 'error');
@@ -1344,10 +1285,12 @@
             const loadingStatus = document.getElementById('loadingStatus');
             
             if (loading) {
-                overlay.classList.remove('hidden');
+                overlay.classList.add('is-visible');
+                overlay.setAttribute('aria-hidden', 'false');
                 loadingStatus.textContent = message;
             } else {
-                overlay.classList.add('hidden');
+                overlay.classList.remove('is-visible');
+                overlay.setAttribute('aria-hidden', 'true');
             }
         }
 
@@ -1358,26 +1301,24 @@
             const toast = document.getElementById('toast');
             const icon = document.getElementById('toastIcon');
             const msg = document.getElementById('toastMessage');
-
             msg.textContent = message;
-            
+
+            const base = 'toast-enter fixed bottom-6 right-6 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 z-50 min-h-[44px]';
             if (type === 'success') {
-                toast.className = 'fixed bottom-6 right-6 bg-emerald-600 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all duration-300 z-50';
+                toast.className = base + ' bg-emerald-600';
                 icon.setAttribute('icon', 'solar:check-circle-linear');
             } else if (type === 'error') {
-                toast.className = 'fixed bottom-6 right-6 bg-rose-600 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all duration-300 z-50';
+                toast.className = base + ' bg-rose-600';
                 icon.setAttribute('icon', 'solar:danger-triangle-linear');
             } else {
-                toast.className = 'fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transition-all duration-300 z-50';
+                toast.className = base + ' bg-slate-900';
                 icon.setAttribute('icon', 'solar:info-circle-linear');
             }
 
-            toast.style.transform = 'translateY(0)';
-            toast.style.opacity = '1';
-
-            setTimeout(() => {
-                toast.style.transform = 'translateY(20px)';
-                toast.style.opacity = '0';
+            toast.classList.add('show');
+            clearTimeout(toast._hideTimer);
+            toast._hideTimer = setTimeout(() => {
+                toast.classList.remove('show');
             }, 3000);
         }
 
@@ -1629,7 +1570,7 @@
                     // Show panel
                     document.getElementById('excelFileName').textContent = fileName;
                     renderExcelColumns();
-                    document.getElementById('excelUploadPanel').classList.remove('hidden');
+                    document.getElementById('excelUploadPanel').classList.add('is-open');
                     
                     // Auto-select AWB column if found
                     autoSelectAwbColumn();
@@ -1764,7 +1705,7 @@
         }
 
         function closeExcelPanel() {
-            document.getElementById('excelUploadPanel').classList.add('hidden');
+            document.getElementById('excelUploadPanel').classList.remove('is-open');
         }
 
         // Excel Import State for large files
@@ -1926,7 +1867,7 @@
                 showToast('No row objects found. Switch off full-data mode or ensure headers exist.', 'error');
                 ExcelImport.isRunning = false;
                 const overlay = document.getElementById('loadingOverlay');
-                if (overlay) overlay.classList.add('hidden');
+                if (overlay) { overlay.classList.remove('is-visible'); overlay.setAttribute('aria-hidden', 'true'); }
                 return;
             }
 
@@ -2020,7 +1961,8 @@
                 ExcelImport.isRunning = false;
                 const overlay = document.getElementById('loadingOverlay');
                 if (overlay) {
-                    overlay.classList.add('hidden');
+                    overlay.classList.remove('is-visible');
+                    overlay.setAttribute('aria-hidden', 'true');
                     overlay.innerHTML = `
                         <div class="bg-white rounded-xl p-8 flex flex-col items-center shadow-2xl">
                             <iconify-icon icon="solar:refresh-linear" width="40" class="text-blue-600 animate-spin mb-4"></iconify-icon>
@@ -2105,7 +2047,8 @@
                     </p>
                 </div>
             `;
-            overlay.classList.remove('hidden');
+            overlay.classList.add('is-visible');
+            overlay.setAttribute('aria-hidden', 'false');
         }
 
         function updateExcelImportProgress() {
@@ -2219,7 +2162,8 @@
             applyFiltersAndRender();
             
             // Hide progress overlay
-            document.getElementById('loadingOverlay').classList.add('hidden');
+            const lo = document.getElementById('loadingOverlay');
+            if (lo) { lo.classList.remove('is-visible'); lo.setAttribute('aria-hidden', 'true'); }
             
             // Restore loading overlay HTML
             document.getElementById('loadingOverlay').innerHTML = `
@@ -3534,8 +3478,9 @@
             State.insightsPanelOpen = !State.insightsPanelOpen;
             const panel = document.getElementById('insightsPanel');
             const chevron = document.getElementById('insightsChevron');
+            const btn = document.getElementById('insightsToggle');
             if (panel) {
-                panel.classList.toggle('hidden', !State.insightsPanelOpen);
+                panel.classList.toggle('is-open', State.insightsPanelOpen);
                 if (State.insightsPanelOpen) {
                     let insights = null;
                     if (typeof API !== 'undefined' && API.getDashboardInsights) {
@@ -3552,7 +3497,8 @@
                     if (section) section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             }
-            if (chevron) chevron.style.transform = State.insightsPanelOpen ? 'rotate(180deg)' : 'none';
+            if (chevron) chevron.style.transform = State.insightsPanelOpen ? 'rotate(180deg)' : '';
+            if (btn) btn.setAttribute('aria-expanded', State.insightsPanelOpen ? 'true' : 'false');
         }
 
         // Professional palette: teal/success, coral/danger, amber/warning, indigo/slate for neutrals
@@ -3864,7 +3810,7 @@
                 return `
                 <tr class="${rowClass} hover:bg-slate-50/50 cursor-pointer transition-colors" onclick="viewShipment('${escapeHtml(s.awb)}')">
                     <td class="py-3 px-4">
-                        <a href="shipment.html?awb=${encodeURIComponent(s.awb)}" class="font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded" onclick="event.stopPropagation();" title="Open shipment detail (tracking history)">${escapeHtml(s.awb)}</a>
+                        <a href="shipment.html?awb=${encodeURIComponent(s.awb)}" class="table-action-link font-mono text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded inline-flex" onclick="event.stopPropagation();" title="Open shipment detail (tracking history)">${escapeHtml(s.awb)}</a>
                         ${s.orderNumber ? `<div class="text-[10px] text-slate-400 mt-0.5">#${escapeHtml(s.orderNumber)}</div>` : ''}
                     </td>
                     <td class="py-3 px-4">
@@ -4133,7 +4079,7 @@
             a.click();
             URL.revokeObjectURL(url);
             
-            showToast(`Exported ${State.filteredShipments.length} records`, 'success');
+            // Export done (no toast)
         }
 
         // =====================================================

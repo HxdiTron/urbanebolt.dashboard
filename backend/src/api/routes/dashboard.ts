@@ -208,19 +208,47 @@ router.get('/summary', async (req: Request, res: Response) => {
                         {
                             $match: {
                                 deliveredOn: null,
-                                bookingDate: { $ne: null, $lte: lifecycleCutoff },
-                                $or: [
-                                    { isRTO: { $ne: true } },
-                                    { isRTO: null },
+                                bookingDate: { $ne: null, $gte: minValidEdd, $lte: lifecycleCutoff },
+                                $and: [
+                                    {
+                                        $or: [
+                                            { isRTO: { $ne: true } },
+                                            { isRTO: null },
+                                            { isRTO: false },
+                                        ],
+                                    },
+                                    {
+                                        $or: [
+                                            { status: { $nin: ['RTO', 'RTD', 'rto', 'rtd'] } },
+                                            { status: null },
+                                        ],
+                                    },
                                 ],
                             },
                         },
                         { $count: 'count' },
                     ],
+                    // On-time rate (DSR): only true customer deliveries (exclude RTO/RTD),
+                    // and treat missing/invalid EDD as on-time by default (we can't prove they are late).
                     onTime: [
                         {
                             $match: {
                                 deliveredOn: { $ne: null },
+                                $and: [
+                                    {
+                                        $or: [
+                                            { isRTO: { $ne: true } },
+                                            { isRTO: null },
+                                            { isRTO: false },
+                                        ],
+                                    },
+                                    {
+                                        $or: [
+                                            { status: { $nin: ['RTO', 'RTD', 'rto', 'rtd'] } },
+                                            { status: null },
+                                        ],
+                                    },
+                                ],
                                 $or: [
                                     { edd: null },
                                     { edd: { $lt: minValidEdd } },
@@ -230,7 +258,30 @@ router.get('/summary', async (req: Request, res: Response) => {
                         },
                         { $count: 'count' },
                     ],
-                    delivered: [{ $match: { deliveredOn: { $ne: null } } }, { $count: 'count' }],
+                    // Delivered denominator for on-time rate: same exclusion of RTO/RTD
+                    delivered: [
+                        {
+                            $match: {
+                                deliveredOn: { $ne: null },
+                                $and: [
+                                    {
+                                        $or: [
+                                            { isRTO: { $ne: true } },
+                                            { isRTO: null },
+                                            { isRTO: false },
+                                        ],
+                                    },
+                                    {
+                                        $or: [
+                                            { status: { $nin: ['RTO', 'RTD', 'rto', 'rtd'] } },
+                                            { status: null },
+                                        ],
+                                    },
+                                ],
+                            },
+                        },
+                        { $count: 'count' },
+                    ],
                     revenueAtRisk: [
                         {
                             $match: {
@@ -474,13 +525,50 @@ router.get('/insights', async (req: Request, res: Response) => {
                             $group: {
                                 _id: { $ifNull: ['$destination', 'N/A'] },
                                 total: { $sum: 1 },
-                                delivered: { $sum: { $cond: [{ $ne: ['$deliveredOn', null] }, 1, 0] } },
+                                // Delivered for regional on-time is also limited to true customer deliveries (exclude RTO/RTD)
+                                delivered: {
+                                    $sum: {
+                                        $cond: [
+                                            {
+                                                $and: [
+                                                    { $ne: ['$deliveredOn', null] },
+                                                    {
+                                                        $or: [
+                                                            { $eq: ['$isRTO', null] },
+                                                            { $eq: ['$isRTO', false] },
+                                                        ],
+                                                    },
+                                                    {
+                                                        $or: [
+                                                            { $eq: ['$status', null] },
+                                                            { $not: { $in: [{ $toUpper: { $ifNull: ['$status', ''] } }, ['RTO', 'RTD']] } },
+                                                        ],
+                                                    },
+                                                ],
+                                            },
+                                            1,
+                                            0,
+                                        ],
+                                    },
+                                },
                                 onTime: {
                                     $sum: {
                                         $cond: [
                                             {
                                                 $and: [
                                                     { $ne: ['$deliveredOn', null] },
+                                                    {
+                                                        $or: [
+                                                            { $eq: ['$isRTO', null] },
+                                                            { $eq: ['$isRTO', false] },
+                                                        ],
+                                                    },
+                                                    {
+                                                        $or: [
+                                                            { $eq: ['$status', null] },
+                                                            { $not: { $in: [{ $toUpper: { $ifNull: ['$status', ''] } }, ['RTO', 'RTD']] } },
+                                                        ],
+                                                    },
                                                     {
                                                         $or: [
                                                             { $eq: ['$edd', null] },

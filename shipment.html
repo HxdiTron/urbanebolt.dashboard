@@ -193,9 +193,14 @@
                 const push = (code, dateStr, desc, location) => {
                     if (dateStr) entries.push({ statusCode: code, statusDateTime: dateStr, statusDescription: desc, currentLocation: location || '', reasonCodeDescription: '' });
                 };
+                // Build from all available date columns for complete timeline
                 push('MAN', doc.manifestTime || doc.firstScanTime, 'Manifested', doc.origin);
                 push('PKD', doc.bookingDate || doc.pickupTime, 'Picked up', doc.origin);
                 push('OFD', doc.ofdTime, 'Out for delivery', doc.destination);
+                // Add RTO scan if RTO status
+                if (isRto && !deliveredOn) {
+                    push('RTO', doc.lastUpdateTime || doc.uploadedAt || doc.bookingDate, 'Returned to Origin', doc.origin);
+                }
                 push(isRto ? 'RTD' : 'DDL', deliveredOn, isRto ? 'RTO Delivered' : 'Delivered', doc.destination);
                 list = entries.filter(e => e.statusDateTime);
             }
@@ -240,6 +245,28 @@
             };
         }
 
+        /** Merge scans from multiple sources, deduplicate by statusCode+dateTime, sort chronologically */
+        function mergeScans(...scanArrays) {
+            const seen = new Set();
+            const all = [];
+            scanArrays.forEach(arr => {
+                if (Array.isArray(arr)) {
+                    arr.forEach(scan => {
+                        if (!scan || typeof scan !== 'object') return;
+                        const normalized = normalizeScan(scan);
+                        const key = `${normalized.statusCode || ''}_${normalized.statusDateTime || ''}_${normalized.statusDescription || ''}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            all.push(normalized);
+                        }
+                    });
+                }
+            });
+            const parse = (s) => (s && (new Date(s)).getTime()) || 0;
+            all.sort((a, b) => parse(a.statusDateTime) - parse(b.statusDateTime));
+            return all;
+        }
+
         async function loadShipment() {
             const awb = document.getElementById('awbInput').value.trim();
             if (!awb) {
@@ -251,31 +278,104 @@
             
             try {
                 let data = null;
+                let mongoScans = [];
+                let trackingScans = [];
+                
+                // Fetch from MongoDB first
                 if (typeof API !== 'undefined' && API.getShipmentByAwbFromMongo) {
-                    data = await API.getShipmentByAwbFromMongo(awb);
-                    if (data) data = mongoDocToTrackingFormat(data);
-                }
-                if (!data && typeof API !== 'undefined' && API.tracking && API.tracking.getByAwb) {
-                    try {
-                        data = await API.tracking.getByAwb(awb);
-                    } catch (e) {
-                        if (e.status !== 404) throw e;
+                    const mongoDoc = await API.getShipmentByAwbFromMongo(awb);
+                    if (mongoDoc) {
+                        const mongoFormatted = mongoDocToTrackingFormat(mongoDoc);
+                        mongoScans = mongoFormatted.scans || [];
+                        data = mongoFormatted;
                     }
                 }
-                // Pull POD image URL from tracking API when missing or relative (so image loads from API)
-                if (data && typeof API !== 'undefined' && API.tracking && API.tracking.getByAwb) {
-                    const pod = (data.delPod || data.podUrl || '').trim();
-                    if (!pod || pod.startsWith('/')) {
-                        try {
-                            const trackingData = await API.tracking.getByAwb(awb);
-                            if (trackingData) {
+                
+                // Always try to fetch from tracking API to get complete scan history
+                if (typeof API !== 'undefined' && API.tracking && API.tracking.getByAwb) {
+                    try {
+                        const trackingData = await API.tracking.getByAwb(awb);
+                        if (trackingData) {
+                            trackingScans = Array.isArray(trackingData.scans) ? trackingData.scans : [];
+                            // Merge POD URL if missing or relative
+                            if (trackingData.delPod || trackingData.pod_url || trackingData.podUrl || trackingData.proof_of_delivery_url) {
                                 const apiPod = (trackingData.delPod || trackingData.pod_url || trackingData.podUrl || trackingData.proof_of_delivery_url || '').trim();
-                                if (apiPod) data.delPod = apiPod;
+                                if (apiPod && (!data || !data.delPod || data.delPod.startsWith('/'))) {
+                                    if (!data) data = {};
+                                    data.delPod = apiPod;
+                                }
                             }
-                        } catch (_) { /* ignore */ }
+                            // Merge other fields if data is missing
+                            if (!data) {
+                                data = trackingData;
+                                if (!data.scans) data.scans = [];
+                            } else {
+                                // Merge scans from both sources for complete history
+                                const merged = mergeScans(mongoScans, trackingScans);
+                                data.scans = merged.length > 0 ? merged : (mongoScans.length > 0 ? mongoScans : []);
+                            }
+                        }
+                    } catch (e) {
+                        // Tracking API failed - keep MongoDB data
+                        if (e.status !== 404 && !data) throw e;
+                    }
+                }
+                
+                // Ensure scans is always set: use MongoDB scans if available, otherwise try to build from dates
+                if (data) {
+                    if (!data.scans || !Array.isArray(data.scans) || data.scans.length === 0) {
+                        if (mongoScans.length > 0) {
+                            data.scans = mongoScans;
+                        } else {
+                            // Try to rebuild from dates if we have MongoDB doc fields
+                            const docFields = {
+                                scans: [],
+                                manifestTime: data.manifestTime,
+                                firstScanTime: data.firstScanTime,
+                                bookingDate: data.bookingDate || data.addedOn,
+                                pickupTime: data.pickupTime,
+                                ofdTime: data.ofdTime,
+                                deliveredOn: data.deliveredOn,
+                                isRTO: data.isRto,
+                                origin: data.origin,
+                                destination: data.destination,
+                                lastUpdateTime: data.lastUpdateTime || data.currentStatusDateTime,
+                                uploadedAt: data.uploadedAt,
+                                status: data.currentStatusCode || '',
+                            };
+                            const rebuilt = buildScansFromDoc(docFields);
+                            data.scans = rebuilt.scans || [];
+                            if (rebuilt.derivedFromDates) data.trackingDerivedFromDates = true;
+                            
+                            // If still no scans but we have shipment data, add at least a basic status scan
+                            if (data.scans.length === 0 && data.awbNumber) {
+                                const statusCode = data.currentStatusCode || '';
+                                const statusDesc = data.currentStatusCodeDescription || 'Shipment found';
+                                const statusDate = data.currentStatusDateTime || data.addedOn || new Date().toISOString();
+                                data.scans = [{
+                                    statusCode: statusCode || 'UNK',
+                                    statusDateTime: statusDate,
+                                    statusDescription: statusDesc,
+                                    currentLocation: data.currentLocation || data.destination || '',
+                                    reasonCodeDescription: '',
+                                }];
+                                data.trackingDerivedFromDates = true;
+                            }
+                        }
                     }
                 }
                 if (data) {
+                    if (data.delPod && typeof API !== 'undefined' && API.getPodBatch) {
+                        const raw = (data.delPod || '').trim();
+                        const m = raw.match(/delivery_pods[/\\](.+)$/i);
+                        const podPath = m ? m[1].replace(/\\/g, '/') : (raw.indexOf('delivery_pods') >= 0 ? raw.replace(/^.*delivery_pods[/\\]?/i, '').replace(/\\/g, '/') : null);
+                        if (podPath) {
+                            try {
+                                const batch = await API.getPodBatch([podPath]);
+                                if (batch.results && batch.results[0] && batch.results[0].dataUrl) data.podDataUrl = batch.results[0].dataUrl;
+                            } catch (_) {}
+                        }
+                    }
                     renderShipment(data);
                     history.replaceState(null, '', `?awb=${encodeURIComponent(awb)}`);
                 } else {
@@ -389,27 +489,30 @@
         /**
          * Render shipment details from API response
          */
-        /** Resolve POD URL: relative paths (e.g. /delivery_pods/...) must be requested from the API origin so the backend can serve them */
+        /** Resolve POD URL: relative paths must be requested from the API origin (backend serves /delivery_pods) */
         function resolvePodUrl(url) {
             const u = (url || '').trim();
             if (!u) return '';
             if (u.startsWith('http://') || u.startsWith('https://')) return u;
-            if (u.startsWith('/')) {
-                const base = (typeof API !== 'undefined' && API.getConfig && API.getConfig().baseUrl) ? API.getConfig().baseUrl : window.location.origin;
-                return (base || '').replace(/\/$/, '') + u;
-            }
+            const base = (typeof API !== 'undefined' && API.getConfig && API.getConfig().baseUrl) ? API.getConfig().baseUrl : window.location.origin;
+            const baseClean = (base || '').replace(/\/$/, '');
+            if (u.startsWith('/')) return baseClean + u;
+            if (u.startsWith('delivery_pods')) return baseClean + '/' + u;
             return u;
         }
-        /** URL to use for <img> so POD loads in-page: same-origin use as-is, external use backend proxy to avoid CORS */
+        /** URL to use for <img>: resolved URL (so delivery_pods paths hit backend, not static server) */
         function podImageSrc(absolutePodUrl) {
-            if (!absolutePodUrl) return '';
+            const resolved = resolvePodUrl(absolutePodUrl);
+            if (!resolved) return '';
             const origin = window.location.origin;
             try {
-                const u = new URL(absolutePodUrl, origin);
-                if (u.origin === origin) return absolutePodUrl;
-            } catch (_) { return absolutePodUrl; }
-            const base = (typeof API !== 'undefined' && API.getConfig && API.getConfig().baseUrl) ? API.getConfig().baseUrl : origin;
-            return (base.replace(/\/$/, '') + '/api/v1/dashboard/pod?url=' + encodeURIComponent(absolutePodUrl));
+                const u = new URL(resolved, origin);
+                if (u.origin === origin) return resolved;
+                const base = (typeof API !== 'undefined' && API.getConfig && API.getConfig().baseUrl) ? API.getConfig().baseUrl : origin;
+                return (base.replace(/\/$/, '') + '/api/v1/dashboard/pod?url=' + encodeURIComponent(resolved));
+            } catch (e) {
+                return resolved;
+            }
         }
 
         function renderShipment(data) {
@@ -417,6 +520,7 @@
             const lifecycle = calculateLifecycle(data, statusCode);
             const rawPod = (data.delPod || data.podUrl || data.pod_url || data.proofOfDelivery || '').trim();
             const delPod = resolvePodUrl(rawPod);
+            const podDataUrl = data.podDataUrl || '';
             
             const shipment = {
                 awb: String(data.awbNumber || ''),
@@ -593,9 +697,13 @@
                         <div class="bg-white rounded-xl premium-border premium-shadow p-6">
                             <h3 class="text-sm font-bold text-slate-900 mb-4">Proof of Delivery</h3>
                             ${shipment.delPod ? `
-                            <div class="block">
-                                <img src="${escapeHtml(podImageSrc(shipment.delPod))}" alt="Proof of delivery" class="w-full rounded-lg border border-slate-200 hover:border-blue-400 transition-colors object-contain max-h-80 bg-slate-50" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'; var n=this.nextElementSibling; if(n) n.style.display='block';">
-                                <p class="text-xs text-slate-500 p-4 text-center bg-slate-50 rounded-lg border border-slate-200" style="display:none;">Image could not be loaded. <a href="${escapeHtml(shipment.delPod)}" target="_blank" rel="noopener" class="text-blue-600 font-medium">Open link</a></p>
+                            <div class="block relative">
+                                <img id="podImage" src="${podDataUrl ? podDataUrl : escapeHtml(podImageSrc(shipment.delPod))}" alt="Proof of delivery" class="w-full rounded-lg border border-slate-200 hover:border-blue-400 transition-colors object-contain max-h-80 bg-slate-50" loading="lazy" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="handlePodError(this, '${escapeHtml(shipment.delPod)}')">
+                                <div id="podError" class="hidden text-xs text-slate-500 p-4 text-center bg-slate-50 rounded-lg border border-slate-200">
+                                    <p>Image could not be loaded.</p>
+                                    <a href="${escapeHtml(shipment.delPod)}" target="_blank" rel="noopener" class="text-blue-600 font-medium mt-2 inline-block">Open link</a>
+                                    <button onclick="retryPodImage('${escapeHtml(shipment.delPod)}')" class="ml-3 text-blue-600 font-medium hover:text-blue-800">Retry</button>
+                                </div>
                             </div>
                             <a href="${escapeHtml(shipment.delPod)}" target="_blank" rel="noopener" class="mt-3 flex items-center justify-center gap-2 text-xs text-blue-600 hover:text-blue-800 font-medium">
                                 <iconify-icon icon="solar:gallery-wide-linear" width="14"></iconify-icon>
@@ -725,6 +833,38 @@
             if (code === 'UDD' || code === 'NDR') return 'bg-orange-100 text-orange-700';
             if (code === 'CAN') return 'bg-slate-100 text-slate-700';
             return 'bg-slate-100 text-slate-700';
+        }
+
+        // POD image error handling
+        function handlePodError(imgEl, originalUrl) {
+            imgEl.style.display = 'none';
+            const errorDiv = document.getElementById('podError');
+            if (errorDiv) {
+                errorDiv.classList.remove('hidden');
+            }
+            console.warn('[POD] Image failed to load:', originalUrl);
+        }
+        
+        async function retryPodImage(originalUrl) {
+            const imgEl = document.getElementById('podImage');
+            const errorDiv = document.getElementById('podError');
+            if (!imgEl || !errorDiv) return;
+            errorDiv.classList.add('hidden');
+            imgEl.style.display = 'block';
+            const raw = (originalUrl || '').trim();
+            const m = raw.match(/delivery_pods[/\\](.+)$/i);
+            const podPath = m ? m[1].replace(/\\/g, '/') : (raw.indexOf('delivery_pods') >= 0 ? raw.replace(/^.*delivery_pods[/\\]?/i, '').replace(/\\/g, '/') : null);
+            if (podPath && typeof API !== 'undefined' && API.getPodBatch) {
+                try {
+                    const batch = await API.getPodBatch([podPath]);
+                    if (batch.results && batch.results[0] && batch.results[0].dataUrl) {
+                        imgEl.src = batch.results[0].dataUrl;
+                        return;
+                    }
+                } catch (_) {}
+            }
+            const proxyUrl = podImageSrc(originalUrl);
+            imgEl.src = proxyUrl !== originalUrl ? proxyUrl : (originalUrl + (originalUrl.includes('?') ? '&' : '?') + '_t=' + Date.now());
         }
 
         // Enter key to track

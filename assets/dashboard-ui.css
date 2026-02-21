@@ -1,0 +1,364 @@
+/**
+ * UrbaneBolt Dashboard — Production UI
+ * Smooth scroll, GPU-accelerated animations, responsive layout, touch-friendly.
+ */
+
+/* ---------------------------------------------------------------------------
+   SMOOTH SCROLL & CONTAINMENT (no layout shifts, no jank)
+--------------------------------------------------------------------------- */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* Momentum scrolling on iOS/Android */
+.dashboard-scroll,
+.u-scroll-y,
+.insights-flow {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+}
+
+#dashboardScroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  /* Contain layout so scroll doesn't trigger reflows */
+  contain: layout style;
+}
+
+/* Scrollbar styling (thin, non-intrusive) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #e2e8f0 transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   GPU-ACCELERATED ANIMATIONS (transform/opacity only)
+--------------------------------------------------------------------------- */
+.u-transition {
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+  will-change: transform;
+}
+.u-transition-slow {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sidebar slide (mobile); on desktop always visible */
+.sidebar-drawer {
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+.sidebar-drawer.is-open {
+  transform: translateX(0);
+}
+@media (min-width: 1024px) {
+  .sidebar-drawer {
+    transform: none;
+  }
+}
+
+/* Overlay fade */
+.sidebar-overlay {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease-out, visibility 0.25s ease-out;
+}
+.sidebar-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Insights panel expand/collapse */
+.insights-panel-body {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out;
+}
+.insights-panel-body.is-open {
+  max-height: 1200px; /* enough for content */
+  opacity: 1;
+}
+
+/* Chevron rotate */
+.insights-chevron {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Excel panel */
+.excel-panel {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease-out;
+}
+.excel-panel.is-open {
+  max-height: 90vh;
+  opacity: 1;
+  overflow-y: auto;
+}
+
+/* Loading overlay & toast */
+.loading-overlay {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+}
+.loading-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.toast-enter {
+  transform: translateY(1.5rem);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-out;
+}
+.toast-enter.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   TOUCH TARGETS (min 44px for tap areas — iOS HIG / Material)
+--------------------------------------------------------------------------- */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Buttons and links in nav/header */
+nav a,
+header button:not([class*="hidden"]),
+.status-chip,
+.type-chip,
+#insightsToggle,
+[data-touch-target] {
+  min-height: 44px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* Table action links: ensure tap area */
+.table-action-link {
+  min-height: 44px;
+  min-width: 44px;
+  align-items: center;
+  justify-content: center;
+  display: inline-flex;
+  padding: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   RESPONSIVE & MOBILE
+--------------------------------------------------------------------------- */
+/* Prevent any content from causing horizontal scroll */
+main,
+#dashboardScroll,
+.u-no-overflow-x {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Table wrapper: scroll only the table, not the page */
+.table-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin-left: -1px;
+  margin-right: -1px;
+}
+.table-wrapper table {
+  min-width: 800px;
+}
+
+/* Insights flow: horizontal scroll on small screens only */
+.insights-flow {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.insights-flow .insight-card {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+  min-width: min(320px, 100%);
+}
+@media (min-width: 1024px) {
+  .insights-flow {
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+}
+
+/* Mobile: stack header elements, full-width inputs */
+@media (max-width: 639px) {
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .header-actions input,
+  .header-actions button {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
+/* Safe area for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #toast {
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   SPACING & TYPOGRAPHY SCALE
+--------------------------------------------------------------------------- */
+:root {
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --radius-card: 0.75rem;
+  --radius-btn: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   EXISTING OVERRIDES (premium shadow, status chips, etc.)
+--------------------------------------------------------------------------- */
+.premium-shadow {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02), 0 10px 25px rgba(0, 0, 0, 0.03);
+}
+.premium-border {
+  border: 1px solid #e2e8f0;
+}
+
+.status-chip {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid transparent;
+}
+.status-chip:hover {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+.status-chip.active {
+  background-color: #1e293b;
+  color: white;
+  border-color: #1e293b;
+}
+.status-chip.failure-chip:hover {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+.status-chip.failure-chip.active {
+  background-color: #dc2626;
+  border-color: #dc2626;
+  color: white;
+}
+
+.delay-positive { color: #059669; background-color: #d1fae5; }
+.delay-negative { color: #dc2626; background-color: #fee2e2; font-weight: 600; }
+.delay-neutral { color: #64748b; background-color: #f1f5f9; }
+
+.sla-ontime { background-color: #d1fae5; color: #047857; }
+.sla-delayed { background-color: #fee2e2; color: #dc2626; }
+.sla-breach { background-color: #fef3c7; color: #b45309; }
+.sla-critical {
+  background: linear-gradient(135deg, #fee2e2, #fef3c7);
+  color: #dc2626;
+}
+
+.row-failure {
+  background-color: #fef2f2 !important;
+  border-left: 3px solid #dc2626;
+}
+.row-breach {
+  background-color: #fffbeb !important;
+  border-left: 3px solid #f59e0b;
+}
+
+/* Select dropdown */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.status-delivered { background-color: #d1fae5; color: #047857; }
+.status-intransit { background-color: #dbeafe; color: #1d4ed8; }
+.status-ofd { background-color: #fef3c7; color: #b45309; }
+.status-rto { background-color: #fee2e2; color: #dc2626; }
+.status-ndr { background-color: #ffedd5; color: #c2410c; }
+.status-cancelled { background-color: #f1f5f9; color: #475569; }
+.row-delivered { border-left: 3px solid #10b981; }
+.row-intransit { border-left: 3px solid #3b82f6; }
+.row-ofd { border-left: 3px solid #f59e0b; }
+.row-exception { border-left: 3px solid #ef4444; }
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .sidebar-drawer,
+  .insights-panel-body,
+  .excel-panel,
+  .loading-overlay,
+  .sidebar-overlay,
+  .toast-enter,
+  .insights-chevron {
+    transition-duration: 0.01ms;
+  }
+}

@@ -683,6 +683,28 @@ const API = (() => {
         }
     }
 
+    /**
+     * Fetch up to 20 POD images via batch API. paths: array of paths (e.g. "THN/2026/02/05/xxx.png" or full URL containing delivery_pods/...).
+     * Returns { results: [ { path, dataUrl } ] }.
+     */
+    async function getPodBatch(paths) {
+        if (!CONFIG.baseUrl || !Array.isArray(paths) || paths.length === 0) return { results: [] };
+        const slice = paths.slice(0, 20);
+        const url = `${CONFIG.baseUrl.replace(/\/$/, '')}/api/v1/dashboard/pod/batch`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths: slice }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return { results: [] };
+            return { results: data.results || [] };
+        } catch (_) {
+            return { results: [] };
+        }
+    }
+
     // =========================================================
     // PUBLIC API
     // =========================================================
@@ -699,6 +721,7 @@ const API = (() => {
         getShipmentByAwbFromMongo,
         getDashboardSummary,
         getDashboardInsights,
+        getPodBatch,
         getStatus,
         clearQueue,
         MAX_BATCH_SIZE: 20,
